@@ -1,0 +1,20 @@
+{
+  "conditions": [
+    {
+      "type": "hardcore_region_difficulty:deeperdarker_cataclysm"
+    }
+  ],
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "minecraft:netherite_upgrade_smithing_template"
+  },
+  "base": {
+    "item": "deeperdarker:warden_helmet"
+  },
+  "addition": {
+    "item": "cataclysm:monstrous_horn"
+  },
+  "result": {
+    "item": "cataclysm:monstrous_helm"
+  }
+}

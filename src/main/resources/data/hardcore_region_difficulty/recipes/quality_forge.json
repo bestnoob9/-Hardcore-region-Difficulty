@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "III", "SAS", "SSS" ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "A": { "item": "minecraft:anvil" },
+    "S": { "item": "minecraft:smooth_stone" }
+  },
+  "result": { "item": "hardcore_region_difficulty:quality_forge" }
+}

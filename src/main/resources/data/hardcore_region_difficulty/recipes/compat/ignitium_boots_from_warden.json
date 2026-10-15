@@ -1,0 +1,20 @@
+{
+  "conditions": [
+    {
+      "type": "hardcore_region_difficulty:deeperdarker_cataclysm"
+    }
+  ],
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "cataclysm:ignitium_upgrade_smithing_template"
+  },
+  "base": {
+    "item": "deeperdarker:warden_boots"
+  },
+  "addition": {
+    "item": "cataclysm:ignitium_ingot"
+  },
+  "result": {
+    "item": "cataclysm:ignitium_boots"
+  }
+}

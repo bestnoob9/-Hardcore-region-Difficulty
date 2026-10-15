@@ -1,0 +1,28 @@
+{
+  "conditions": [
+    {
+      "type": "hardcore_region_difficulty:deeperdarker_cataclysm"
+    }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " /#",
+    "/#/",
+    "N/ "
+  ],
+  "key": {
+    "/": {
+      "item": "minecraft:blaze_rod"
+    },
+    "#": {
+      "item": "cataclysm:ignitium_ingot"
+    },
+    "N": {
+      "item": "deeperdarker:warden_sword"
+    }
+  },
+  "result": {
+    "item": "cataclysm:the_incinerator",
+    "count": 1
+  }
+}

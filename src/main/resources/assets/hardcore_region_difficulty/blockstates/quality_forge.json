@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "hardcore_region_difficulty:block/quality_forge" },
+    "facing=east":  { "model": "hardcore_region_difficulty:block/quality_forge", "y": 90 },
+    "facing=south": { "model": "hardcore_region_difficulty:block/quality_forge", "y": 180 },
+    "facing=west":  { "model": "hardcore_region_difficulty:block/quality_forge", "y": 270 }
+  }
+}

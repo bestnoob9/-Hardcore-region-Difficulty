@@ -1,0 +1,20 @@
+{
+  "conditions": [
+    {
+      "type": "hardcore_region_difficulty:deeperdarker_cataclysm"
+    }
+  ],
+  "type": "minecraft:smithing_transform",
+  "template": {
+    "item": "cataclysm:cursium_upgrade_smithing_template"
+  },
+  "base": {
+    "item": "deeperdarker:warden_boots"
+  },
+  "addition": {
+    "item": "cataclysm:cursium_ingot"
+  },
+  "result": {
+    "item": "cataclysm:cursium_boots"
+  }
+}
