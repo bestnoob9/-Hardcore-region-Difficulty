@@ -15,6 +15,8 @@ import java.util.stream.Stream;
 
 public class AdvancedEnchantments {
 
+    // Rarity quyết định giá XP trên đe (đồ / sách mỗi cấp): COMMON 1/1, UNCOMMON 2/1, RARE 4/2, VERY_RARE 8/4.
+    // Nâng cao = UNCOMMON, Đánh Nhanh + Xuyên Giáp = COMMON, Sát Thương Chuẩn = RARE.
     public static final DeferredRegister<Enchantment> ENCHANTMENTS =
             DeferredRegister.create(ForgeRegistries.ENCHANTMENTS, HardcoreRegionDifficulty.MODID);
 
@@ -24,37 +26,37 @@ public class AdvancedEnchantments {
     private static final EquipmentSlot[] MAINHAND = { EquipmentSlot.MAINHAND };
 
     public static final RegistryObject<Enchantment> ADVANCED_PROTECTION = ENCHANTMENTS.register("advanced_protection",
-            () -> new AdvancedProtectionEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.ARMOR, ARMOR_SLOTS));
+            () -> new AdvancedProtectionEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.ARMOR, ARMOR_SLOTS));
     public static final RegistryObject<Enchantment> ADVANCED_THORNS = ENCHANTMENTS.register("advanced_thorns",
-            () -> new AdvancedThornsEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.ARMOR, ARMOR_SLOTS));
+            () -> new AdvancedThornsEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.ARMOR, ARMOR_SLOTS));
     public static final RegistryObject<Enchantment> ADVANCED_FEATHER_FALLING = ENCHANTMENTS.register("advanced_feather_falling",
-            () -> new AdvancedFeatherFallingEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.ARMOR_FEET,
+            () -> new AdvancedFeatherFallingEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.ARMOR_FEET,
                     new EquipmentSlot[] { EquipmentSlot.FEET }));
 
     public static final RegistryObject<Enchantment> ADVANCED_SHARPNESS = ENCHANTMENTS.register("advanced_sharpness",
-            () -> new AdvancedSharpnessEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new AdvancedSharpnessEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
     public static final RegistryObject<Enchantment> ADVANCED_FIRE_ASPECT = ENCHANTMENTS.register("advanced_fire_aspect",
-            () -> new AdvancedFireAspectEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new AdvancedFireAspectEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
     public static final RegistryObject<Enchantment> ADVANCED_KNOCKBACK = ENCHANTMENTS.register("advanced_knockback",
-            () -> new AdvancedKnockbackEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new AdvancedKnockbackEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
     public static final RegistryObject<Enchantment> ADVANCED_LOOTING = ENCHANTMENTS.register("advanced_looting",
-            () -> new AdvancedLootingEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new AdvancedLootingEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> SWIFT_STRIKE = ENCHANTMENTS.register("swift_strike",
-            () -> new SwiftStrikeEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new SwiftStrikeEnchantment(Enchantment.Rarity.COMMON, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> ARMOR_PIERCING = ENCHANTMENTS.register("armor_piercing",
-            () -> new ArmorPiercingEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new ArmorPiercingEnchantment(Enchantment.Rarity.COMMON, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> TRUE_DAMAGE = ENCHANTMENTS.register("true_damage",
-            () -> new TrueDamageEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new TrueDamageEnchantment(Enchantment.Rarity.RARE, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> ADVANCED_POWER = ENCHANTMENTS.register("advanced_power",
-            () -> new AdvancedPowerEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.BOW, MAINHAND));
+            () -> new AdvancedPowerEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.BOW, MAINHAND));
     public static final RegistryObject<Enchantment> ADVANCED_EFFICIENCY = ENCHANTMENTS.register("advanced_efficiency",
-            () -> new AdvancedEfficiencyEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.DIGGER, MAINHAND));
+            () -> new AdvancedEfficiencyEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.DIGGER, MAINHAND));
     public static final RegistryObject<Enchantment> ADVANCED_UNBREAKING = ENCHANTMENTS.register("advanced_unbreaking",
-            () -> new AdvancedUnbreakingEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.BREAKABLE,
+            () -> new AdvancedUnbreakingEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.BREAKABLE,
                     new EquipmentSlot[] { EquipmentSlot.MAINHAND, EquipmentSlot.OFFHAND,
                             EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET }));
 
