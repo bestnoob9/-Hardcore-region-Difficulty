@@ -12,6 +12,7 @@
 - Biome, dimension & structure based: every region has a difficulty level (1-5). Structures like Nether Fortresses, Ancient Cities or End Cities raise it.
 - Smart Auto mode: automatically rates dangerous areas based on nearby spawners and clusters of hostile mobs.
 - Stronger hostile mobs: health, damage, armor and speed grow with each difficulty level. Bosses are left untouched.
+- Raids are always Difficulty III: every mob a raid spawns (vanilla or added by other mods, any `Raider`) is fixed at level 3 no matter the region. Set `raid_difficulty_level` in `scaling_settings` to change it (0 = off).
 - On-screen region titles announce the danger level when you enter a new area, plus boss proximity warnings.
 - Fully configurable with flexible patterns: exact IDs, `#tags`, `~regex`, `*` and `!` negation.
 

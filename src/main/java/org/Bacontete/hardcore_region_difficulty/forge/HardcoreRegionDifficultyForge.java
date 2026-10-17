@@ -140,6 +140,9 @@ public class HardcoreRegionDifficultyForge {
         if (event.getEntity() instanceof Mob mob && mob.tickCount <= 220 && !mob.level().isClientSide) {
             EntityScaler.fixInitialHealth(mob);
         }
+        if (event.getEntity() instanceof Mob raidMob && !raidMob.level().isClientSide && raidMob.tickCount % 20 == 0) {
+            EntityScaler.checkRaidJoin(raidMob);
+        }
     }
 
     @SubscribeEvent

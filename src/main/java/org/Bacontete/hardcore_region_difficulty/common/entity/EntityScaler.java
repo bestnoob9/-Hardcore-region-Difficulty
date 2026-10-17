@@ -13,6 +13,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.entity.raid.Raider;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.ScalingSettings;
@@ -26,6 +27,7 @@ public class EntityScaler {
 
     private static final String SCALED_TAG = HardcoreRegionDifficulty.MODID + ":scaled";
     private static final String LEVEL_TAG = HardcoreRegionDifficulty.MODID + ":level";
+    private static final String RAID_TAG = HardcoreRegionDifficulty.MODID + ":raid_scaled";
 
     private static final String HEAL_TAG = HardcoreRegionDifficulty.MODID + ":heal_to_max";
 
@@ -39,6 +41,20 @@ public class EntityScaler {
 
     private static UUID modifierId(String name) {
         return UUID.nameUUIDFromBytes((HardcoreRegionDifficulty.MODID + ":" + name).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Fixed raid difficulty for this mob, or 0 when it is not a raid member (or the feature is disabled).
+     * Every vanilla and modded raid mob is a {@link Raider} (Raid.WaveMember only accepts Raider types),
+     * so this also covers mobs added by other mods that are spawned by a raid.
+     */
+    public static int getRaidLevel(Mob mob) {
+        if (!(mob instanceof Raider raider) || raider.getCurrentRaid() == null) {
+            return 0;
+        }
+        DifficultyConfig config = DifficultyConfig.getInstance();
+        ScalingSettings scaling = config == null ? null : config.getScalingSettings();
+        return scaling == null ? 0 : scaling.getRaidDifficultyLevel();
     }
 
     public static void applyScaling(Mob mob) {
@@ -55,8 +71,12 @@ public class EntityScaler {
             return;
         }
 
-        int regionLevel = LocationMatcher.getDifficultyLevel(mob.level(), mob.blockPosition());
-        int bossLevel = BossDetector.getBossDifficultyLevel(mob);   
+        int raidLevel = getRaidLevel(mob);
+        int regionLevel = raidLevel > 0 ? raidLevel : LocationMatcher.getDifficultyLevel(mob.level(), mob.blockPosition());
+        if (raidLevel > 0) {
+            data.putBoolean(RAID_TAG, true);
+        }
+        int bossLevel = BossDetector.getBossDifficultyLevel(mob);
         int difficultyLevel = bossLevel > 0 ? bossLevel : regionLevel;
         if (bossLevel > 0) {
             data.putBoolean("is_boss_entity", true);
@@ -77,10 +97,65 @@ public class EntityScaler {
             return;
         }
 
-        ScalingSettings scaling = config.getScalingSettings();
         float oldMax = mob.getMaxHealth();
         float relativeHealth = oldMax > 0 ? mob.getHealth() / oldMax : 1.0F;
+        applyModifiers(mob, config.getScalingSettings(), regionLevel, bossLevel);
 
+        mob.setHealth(relativeHealth * mob.getMaxHealth());
+        if (mob.getMaxHealth() > oldMax + 0.01F) {
+            data.putFloat(HEAL_TAG, oldMax);
+        }
+
+        HardcoreRegionDifficulty.LOGGER.debug("Scaled {} at difficulty level {}{}",
+                mob.getType().getDescription().getString(), difficultyLevel, raidLevel > 0 ? " (raid)" : "");
+    }
+
+    /**
+     * An already existing raider can join a raid later (Raider.aiStep -> Raid.joinRaid(existing = true)),
+     * after it was scaled by its region. Re-scale it once to the fixed raid level.
+     */
+    public static void checkRaidJoin(Mob mob) {
+        if (mob.level().isClientSide) {
+            return;
+        }
+        int raidLevel = getRaidLevel(mob);
+        if (raidLevel <= 0) {
+            return;
+        }
+        CompoundTag data = mob.getPersistentData();
+        if (data.getBoolean(RAID_TAG)) {
+            return;
+        }
+        if (!shouldScale(mob)) {
+            return;
+        }
+        data.putBoolean(RAID_TAG, true);
+
+        DifficultyConfig config = DifficultyConfig.getInstance();
+        if (config == null || config.getScalingSettings() == null) {
+            return;
+        }
+        int bossLevel = BossDetector.getBossDifficultyLevel(mob);
+        if (bossLevel == 0 && data.contains(LEVEL_TAG) && data.getInt(LEVEL_TAG) == raidLevel) {
+            return;
+        }
+
+        float max = mob.getMaxHealth();
+        float relativeHealth = max > 0 ? mob.getHealth() / max : 1.0F;
+        removeModifiers(mob);
+        data.putBoolean(SCALED_TAG, true);
+        data.putInt(LEVEL_TAG, bossLevel > 0 ? bossLevel : raidLevel);
+        data.remove(HEAL_TAG);
+        if (raidLevel > 1 || bossLevel > 0) {
+            applyModifiers(mob, config.getScalingSettings(), raidLevel, bossLevel);
+        }
+        mob.setHealth(Math.min(relativeHealth, 1.0F) * mob.getMaxHealth());
+
+        HardcoreRegionDifficulty.LOGGER.debug("Re-scaled {} to raid difficulty level {}",
+                mob.getType().getDescription().getString(), raidLevel);
+    }
+
+    private static void applyModifiers(Mob mob, ScalingSettings scaling, int regionLevel, int bossLevel) {
         double health = scaling.healthAmount(regionLevel);
         double armorMul = scaling.armorMultiplyAmount(regionLevel);
         double damage = scaling.damageAmount(regionLevel);
@@ -98,14 +173,21 @@ public class EntityScaler {
         add(mob, Attributes.ARMOR, ARMOR_ADD_ID, "armor_add", scaling.armorFlatAmount(regionLevel), AttributeModifier.Operation.ADDITION);
         add(mob, Attributes.ATTACK_DAMAGE, DAMAGE_ID, "damage", damage, AttributeModifier.Operation.MULTIPLY_BASE);
         add(mob, Attributes.MOVEMENT_SPEED, SPEED_ID, "speed", scaling.speedAmount(regionLevel), AttributeModifier.Operation.MULTIPLY_BASE);
+    }
 
-        mob.setHealth(relativeHealth * mob.getMaxHealth());
-        if (mob.getMaxHealth() > oldMax + 0.01F) {
-            data.putFloat(HEAL_TAG, oldMax);
+    private static void removeModifiers(Mob mob) {
+        remove(mob, Attributes.MAX_HEALTH, HEALTH_ID);
+        remove(mob, Attributes.ARMOR, ARMOR_MUL_ID);
+        remove(mob, Attributes.ARMOR, ARMOR_ADD_ID);
+        remove(mob, Attributes.ATTACK_DAMAGE, DAMAGE_ID);
+        remove(mob, Attributes.MOVEMENT_SPEED, SPEED_ID);
+    }
+
+    private static void remove(Mob mob, Attribute attribute, UUID id) {
+        AttributeInstance instance = mob.getAttribute(attribute);
+        if (instance != null && instance.getModifier(id) != null) {
+            instance.removeModifier(id);
         }
-
-        HardcoreRegionDifficulty.LOGGER.debug("Scaled {} at difficulty level {}",
-                mob.getType().getDescription().getString(), difficultyLevel);
     }
 
     public static void fixInitialHealth(Mob mob) {

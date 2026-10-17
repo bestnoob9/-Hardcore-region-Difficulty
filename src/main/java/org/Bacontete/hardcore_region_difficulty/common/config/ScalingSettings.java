@@ -22,6 +22,7 @@ public class ScalingSettings {
     private final double bossHealthPercent;
     private final double bossArmorPercent;
     private final double bossDamagePercent;
+    private final int raidDifficultyLevel;
 
     public static final double DEFAULT_BOSS_HEALTH = 150.0;
 
@@ -38,19 +39,21 @@ public class ScalingSettings {
     public static final double DEFAULT_BOSS_HEALTH_BONUS = 50.0;
     public static final double DEFAULT_BOSS_ARMOR = 35.0;
     public static final double DEFAULT_BOSS_DAMAGE = 30.0;
+    public static final int DEFAULT_RAID_LEVEL = 3;
 
     public ScalingSettings() {
         this(DEFAULT_HEALTH_PERCENT, DEFAULT_DAMAGE_PERCENT, DEFAULT_ARMOR_PERCENT, DEFAULT_SPEED_PERCENT, DEFAULT_ARMOR_FLAT,
                 Collections.emptyList(), DEFAULT_BOSS_HEALTH,
                 DEFAULT_MINI_BOSS_HEALTH, DEFAULT_MINI_BOSS_ARMOR, DEFAULT_MINI_BOSS_DAMAGE,
-                DEFAULT_BOSS_HEALTH_BONUS, DEFAULT_BOSS_ARMOR, DEFAULT_BOSS_DAMAGE);
+                DEFAULT_BOSS_HEALTH_BONUS, DEFAULT_BOSS_ARMOR, DEFAULT_BOSS_DAMAGE, DEFAULT_RAID_LEVEL);
     }
 
     public ScalingSettings(double healthPercent, double damagePercent, double armorPercent,
                            double speedPercent, double armorFlatPerLevel,
                            List<String> excludePatterns, double bossHealthThreshold,
                            double miniBossHealthPercent, double miniBossArmorPercent, double miniBossDamagePercent,
-                           double bossHealthPercent, double bossArmorPercent, double bossDamagePercent) {
+                           double bossHealthPercent, double bossArmorPercent, double bossDamagePercent,
+                           int raidDifficultyLevel) {
         this.excludePatterns = Collections.unmodifiableList(new ArrayList<>(excludePatterns));
         this.bossHealthThreshold = bossHealthThreshold;
         this.healthPercent = healthPercent;
@@ -64,6 +67,7 @@ public class ScalingSettings {
         this.bossHealthPercent = bossHealthPercent;
         this.bossArmorPercent = bossArmorPercent;
         this.bossDamagePercent = bossDamagePercent;
+        this.raidDifficultyLevel = Math.max(0, Math.min(raidDifficultyLevel, 5));
     }
 
     public static ScalingSettings fromJson(JsonObject obj) {
@@ -86,8 +90,9 @@ public class ScalingSettings {
         double bossHealthBonus = num(obj, "boss_health_percent", DEFAULT_BOSS_HEALTH_BONUS);
         double bossArmor = num(obj, "boss_armor_percent", DEFAULT_BOSS_ARMOR);
         double bossDamage = num(obj, "boss_damage_percent", DEFAULT_BOSS_DAMAGE);
+        int raidLevel = (int) num(obj, "raid_difficulty_level", DEFAULT_RAID_LEVEL);
         return new ScalingSettings(health, damage, armor, speed, armorFlat, exclude, bossHealth,
-                miniBossHealth, miniBossArmor, miniBossDamage, bossHealthBonus, bossArmor, bossDamage);
+                miniBossHealth, miniBossArmor, miniBossDamage, bossHealthBonus, bossArmor, bossDamage, raidLevel);
     }
 
     private static double num(JsonObject obj, String key, double def) {
@@ -133,4 +138,6 @@ public class ScalingSettings {
     public double getBossHealthPercent() { return bossHealthPercent; }
     public double getBossArmorPercent() { return bossArmorPercent; }
     public double getBossDamagePercent() { return bossDamagePercent; }
+    /** Fixed difficulty level for every raid mob (0 = disabled, use region level). */
+    public int getRaidDifficultyLevel() { return raidDifficultyLevel; }
 }
