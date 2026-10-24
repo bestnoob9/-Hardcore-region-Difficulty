@@ -1,5 +1,9 @@
 # Changelog
 
+## Update 1.0.4
+
+- Villager trades fix
+
 ## Update 1.0.3
 
 ## Added

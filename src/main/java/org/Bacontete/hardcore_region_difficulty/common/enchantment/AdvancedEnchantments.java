@@ -17,7 +17,7 @@ import java.util.stream.Stream;
 public class AdvancedEnchantments {
 
     // Rarity decides the anvil XP cost (items / books per level): COMMON 1/1, UNCOMMON 2/1, RARE 4/2, VERY_RARE 8/4.
-    // Advanced = UNCOMMON, Swift Strike + Armor Piercing = COMMON, True Damage = RARE.
+    // Advanced = UNCOMMON, Swift Strike + Armor Piercing = COMMON, True Damage = VERY_RARE.
     public static final DeferredRegister<Enchantment> ENCHANTMENTS =
             DeferredRegister.create(ForgeRegistries.ENCHANTMENTS, HardcoreRegionDifficulty.MODID);
 
@@ -50,7 +50,7 @@ public class AdvancedEnchantments {
             () -> new ArmorPiercingEnchantment(Enchantment.Rarity.COMMON, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> TRUE_DAMAGE = ENCHANTMENTS.register("true_damage",
-            () -> new TrueDamageEnchantment(Enchantment.Rarity.RARE, EnchantmentCategory.WEAPON, MAINHAND));
+            () -> new TrueDamageEnchantment(Enchantment.Rarity.VERY_RARE, EnchantmentCategory.WEAPON, MAINHAND));
 
     public static final RegistryObject<Enchantment> ADVANCED_POWER = ENCHANTMENTS.register("advanced_power",
             () -> new AdvancedPowerEnchantment(Enchantment.Rarity.UNCOMMON, EnchantmentCategory.BOW, MAINHAND));

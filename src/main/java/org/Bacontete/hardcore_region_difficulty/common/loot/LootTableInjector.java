@@ -25,7 +25,7 @@ import org.Bacontete.hardcore_region_difficulty.common.enchantment.TrueDamageEnc
 public class LootTableInjector {
 
     /** Loot chance cap (in the highest level region); lower regions get a smaller chance following base_chance_per_level. */
-    public static final double TRUE_DAMAGE_CHANCE = 0.01D;
+    public static final double TRUE_DAMAGE_CHANCE = 0.00025D;
     /** True Damage only drops from regions / structures of this level and above. */
     public static final int TRUE_DAMAGE_MIN_LEVEL = 5;
     public static final double ADVANCED_MAX_CHANCE = 0.05D;

@@ -69,6 +69,6 @@ public class TrueDamageEnchantment extends Enchantment {
 
     @Override
     public boolean isTradeable() {
-        return true;
+        return false;
     }
 }
