@@ -56,5 +56,6 @@ public class DangerCache {
         STRUCTURE_CACHE.clear();
         DIMENSION_CACHE.clear();
         SPAWNER_CACHE.clear();
+        EnemyScanner.clear();
     }
 }

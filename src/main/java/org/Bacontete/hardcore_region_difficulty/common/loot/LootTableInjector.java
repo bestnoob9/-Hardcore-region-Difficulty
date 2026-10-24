@@ -18,15 +18,15 @@ import org.Bacontete.hardcore_region_difficulty.common.enchantment.ArmorPiercing
 import org.Bacontete.hardcore_region_difficulty.common.enchantment.TrueDamageEnchantment;
 
 /**
- * Loot Advanced trong rương. Mọi nguồn ở đây đều:
- * - chỉ ra ở vùng có cấp >= {@code advanced_min_level} (mặc định 3),
- * - tỉ lệ có trần: enchant nâng cao 5%, enchant thường 6% (đạt trần ở vùng cấp cao nhất); Sát Thương Chuẩn 1% chỉ từ cấp 5.
+ * Advanced loot in chests. Every source here is:
+ * - only dropped in regions of level >= {@code advanced_min_level} (default 3),
+ * - capped chance: advanced enchant 5%, normal enchant 6% (reached in the highest level region); True Damage 1%, only from level 5.
  */
 public class LootTableInjector {
 
-    /** Trần tỉ lệ loot (ở vùng cấp cao nhất); vùng thấp hơn tỉ lệ nhỏ dần theo base_chance_per_level. */
+    /** Loot chance cap (in the highest level region); lower regions get a smaller chance following base_chance_per_level. */
     public static final double TRUE_DAMAGE_CHANCE = 0.01D;
-    /** Sát Thương Chuẩn chỉ ra từ vùng/công trình cấp này trở lên. */
+    /** True Damage only drops from regions / structures of this level and above. */
     public static final int TRUE_DAMAGE_MIN_LEVEL = 5;
     public static final double ADVANCED_MAX_CHANCE = 0.05D;
     public static final double NORMAL_MAX_CHANCE = 0.06D;
@@ -38,7 +38,7 @@ public class LootTableInjector {
         return config == null ? null : config.getEnchantmentSettings();
     }
 
-    /** Vùng này có được loot Advanced không (cấp đủ cao). */
+    /** Does this region give Advanced loot (is the level high enough)? */
     public static boolean advancedAllowed(int difficultyLevel) {
         EnchantmentSettings settings = settings();
         return settings != null && settings.allowsAdvancedLoot(difficultyLevel);
@@ -47,7 +47,7 @@ public class LootTableInjector {
     public static ItemStack rollArmorPiercingBook(int difficultyLevel, RandomSource random) {
         EnchantmentSettings settings = settings();
         if (settings == null || !settings.allowsAdvancedLoot(difficultyLevel)
-                || !AdvancedEnchantments.ARMOR_PIERCING.isPresent()) {
+                || !AdvancedEnchantments.isEnabled(AdvancedEnchantments.ARMOR_PIERCING)) {
             return ItemStack.EMPTY;
         }
         if (random.nextDouble() >= scaledChance(settings, NORMAL_MAX_CHANCE, difficultyLevel)) {
@@ -59,7 +59,7 @@ public class LootTableInjector {
         return book;
     }
 
-    /** Tỉ lệ = trần * (tỉ lệ cơ sở của cấp vùng / tỉ lệ cơ sở cao nhất): cấp càng cao càng gần trần. */
+    /** Chance = cap * (base chance of the region level / highest base chance): the higher the level, the closer to the cap. */
     private static double scaledChance(EnchantmentSettings settings, double max, int difficultyLevel) {
         double top = settings.getMaxBaseChance();
         if (top <= 0.0D) {
@@ -72,7 +72,7 @@ public class LootTableInjector {
         EnchantmentSettings settings = settings();
         if (settings == null || !settings.allowsAdvancedLoot(difficultyLevel)
                 || difficultyLevel < TRUE_DAMAGE_MIN_LEVEL
-                || !AdvancedEnchantments.TRUE_DAMAGE.isPresent()) {
+                || !AdvancedEnchantments.isEnabled(AdvancedEnchantments.TRUE_DAMAGE)) {
             return ItemStack.EMPTY;
         }
         if (random.nextDouble() >= TRUE_DAMAGE_CHANCE) {

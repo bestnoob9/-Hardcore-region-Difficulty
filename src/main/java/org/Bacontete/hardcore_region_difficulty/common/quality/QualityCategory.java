@@ -1,15 +1,14 @@
 package org.Bacontete.hardcore_region_difficulty.common.quality;
 
-import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.ItemStack;
 
-import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 /**
- * Item category. Each category only rolls / accepts the QualityTypes that belong to it.
+ * Item category. Each category only rolls / accepts the qualities defined for it in the quality JSON file
+ * (config/hardcore_region_difficulty-qualities.json).
  */
 public enum QualityCategory {
 
@@ -28,24 +27,28 @@ public enum QualityCategory {
     /** Shields. */
     SHIELD;
 
-    public Set<QualityType> getAllowed() {
-        return switch (this) {
-            case WEAPON -> new java.util.HashSet<>(EnumSet.allOf(QualityTypeWeapon.class));
-            case TOOL -> new java.util.HashSet<>(EnumSet.allOf(QualityTypeTool.class));
-            case ARMOR -> new java.util.HashSet<>(EnumSet.allOf(QualityTypeArmor.class));
-            case RANGED -> new java.util.HashSet<>(EnumSet.allOf(QualityTypeRanged.class));
-            case SHIELD -> new java.util.HashSet<>(EnumSet.allOf(QualityTypeShield.class));
-        };
+    /** Key of the category in the JSON file and in commands. */
+    public String key() {
+        return name().toLowerCase(Locale.ROOT);
+    }
+
+    /** All qualities currently defined for this category, in file order. */
+    public List<QualityType> getAllowed() {
+        return new ArrayList<>(QualityRegistry.all(this));
+    }
+
+    /** The quality with that id (case-insensitive) in this category, or null. */
+    public QualityDefinition find(String id) {
+        return QualityRegistry.find(this, id);
+    }
+
+    /** False when the quality list of this category is empty: such items get no quality at all. */
+    public boolean isActive() {
+        return !QualityRegistry.all(this).isEmpty();
     }
 
     public boolean allows(QualityType type) {
-        return switch (this) {
-            case WEAPON -> type instanceof QualityTypeWeapon;
-            case TOOL -> type instanceof QualityTypeTool;
-            case ARMOR -> type instanceof QualityTypeArmor;
-            case RANGED -> type instanceof QualityTypeRanged;
-            case SHIELD -> type instanceof QualityTypeShield;
-        };
+        return type instanceof QualityDefinition d && d.getCategory() == this;
     }
 
     /** Category names used by the commands. */

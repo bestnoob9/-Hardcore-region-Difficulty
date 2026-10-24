@@ -10,6 +10,11 @@ public abstract class AdvancedEnchantmentBase extends Enchantment {
         super(rarity, category, slots);
     }
 
+    /** False when this enchantment is switched off in the common config: it then has no effect. */
+    protected boolean isActive() {
+        return AdvancedEnchantments.isEnabled(this);
+    }
+
     @Override
     public int getMinLevel() {
         return 1;

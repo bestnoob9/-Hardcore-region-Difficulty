@@ -24,18 +24,14 @@ public final class QualityTooltip {
             return;
         }
         ItemStack stack = event.getItemStack();
-        if (!ItemQuality.has(stack)) {
+        QualityType quality = ItemQuality.find(stack);
+        if (quality == null) {
             return;
         }
-        QualityType quality = ItemQuality.get(stack);
         event.getToolTip().add(1, Component.translatable("hardcore_region_difficulty.quality.prefix")
                 .withStyle(ChatFormatting.GRAY)
                 .append(Component.literal(" "))
-                .append(Component.translatable("hardcore_region_difficulty.quality." + quality.name())
-                        .withStyle(quality.getColor())));
-        if (quality.name().equals("STANDARD") || quality.name().equals("THICK")) {
-            return;
-        }
+                .append(quality.getDisplayName()));
         int line = 2;
         if (ItemQuality.isRanged(stack)) {
             String key = stack.getItem() instanceof CrossbowItem ? "load_speed" : "draw_speed";

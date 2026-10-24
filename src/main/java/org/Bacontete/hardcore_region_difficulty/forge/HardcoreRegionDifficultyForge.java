@@ -52,6 +52,7 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
+import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyIcons;
 import org.Bacontete.hardcore_region_difficulty.common.danger.DangerAnalyzer;
 import org.Bacontete.hardcore_region_difficulty.common.danger.DangerCache;
 import org.Bacontete.hardcore_region_difficulty.common.danger.DangerScanner;
@@ -66,12 +67,15 @@ import org.Bacontete.hardcore_region_difficulty.common.villager.VillagerTradeInj
 import org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityCategory;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityConfig;
+import org.Bacontete.hardcore_region_difficulty.common.quality.QualityDefinition;
+import org.Bacontete.hardcore_region_difficulty.common.quality.QualityRegistry;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityType;
 import org.Bacontete.hardcore_region_difficulty.forge.client.ClientConfigHooks;
 import org.Bacontete.hardcore_region_difficulty.forge.compat.CompatCondition;
 import org.Bacontete.hardcore_region_difficulty.forge.compat.DeeperDarkerCataclysmCompat;
 import org.Bacontete.hardcore_region_difficulty.forge.loot.AdvancedEnchantLootModifier;
 import org.Bacontete.hardcore_region_difficulty.forge.quality.QualityEvents;
+import org.Bacontete.hardcore_region_difficulty.forge.boss.VanillaBossEvents;
 import org.Bacontete.hardcore_region_difficulty.forge.quality.QualityForgeRegistry;
 
 import java.util.ArrayList;
@@ -115,6 +119,9 @@ public class HardcoreRegionDifficultyForge {
         MinecraftForge.EVENT_BUS.register(this);
         MinecraftForge.EVENT_BUS.register(new AdvancedEnchantEvents());
         MinecraftForge.EVENT_BUS.register(new QualityEvents());
+        MinecraftForge.EVENT_BUS.register(new VanillaBossEvents());
+        MinecraftForge.EVENT_BUS.register(new org.Bacontete.hardcore_region_difficulty.forge.elite.EliteEvents());
+        MinecraftForge.EVENT_BUS.register(new org.Bacontete.hardcore_region_difficulty.forge.loot.RegionLootEvents());
         MinecraftForge.EVENT_BUS.register(new DeeperDarkerCataclysmCompat());
     }
 
@@ -122,6 +129,7 @@ public class HardcoreRegionDifficultyForge {
         HardcoreRegionDifficulty.LOGGER.info("Hardcore Region Difficulty Forge initializing");
 
         new DifficultyConfig(FMLPaths.CONFIGDIR.get().toFile());
+        QualityRegistry.init(FMLPaths.CONFIGDIR.get().toFile());
         DeeperDarkerCataclysmCompat.verifyDependencies();
     }
 
@@ -157,7 +165,8 @@ public class HardcoreRegionDifficultyForge {
             PlayerRegionTracker.RegionInfo info = PlayerRegionTracker.getPlayerRegion(player);
             if (info != null && !info.regionName.isEmpty()) {
                 NetworkHandler.sendToPlayer(player,
-                        new TitleDisplayPacket(info.regionName, info.difficultyTitle, info.structureName, info.difficultyLevel));
+                        new TitleDisplayPacket(info.regionName, info.difficultyTitle, info.structureName, info.difficultyLevel,
+                                info.icon, DifficultyIcons.parseColorRgb(info.titleColor)));
             }
         }
 
@@ -177,8 +186,25 @@ public class HardcoreRegionDifficultyForge {
         if (config != null) {
             config.loadConfig();
             DangerCache.clear();
+            org.Bacontete.hardcore_region_difficulty.common.config.ConfigShare.ensureFile(config);
         }
         runAutoScan(event.getServer());
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            NetworkHandler.sendQualitiesTo(player);
+        }
+    }
+
+    /** Reads the quality file again and sends the result to every connected player. */
+    static boolean reloadQualities() {
+        boolean ok = QualityRegistry.reload();
+        if (ok && ServerLifecycleHooks.getCurrentServer() != null) {
+            NetworkHandler.sendQualitiesToAll();
+        }
+        return ok;
     }
 
     @SubscribeEvent
@@ -187,6 +213,10 @@ public class HardcoreRegionDifficultyForge {
             return;
         }
         configCheckTicks = 0;
+        if (QualityRegistry.hasFileChanged()) {
+            HardcoreRegionDifficulty.LOGGER.info("Quality file changed, reloading");
+            reloadQualities();
+        }
         DifficultyConfig config = DifficultyConfig.getInstance();
         if (config == null || !config.hasFileChanged()) {
             return;
@@ -288,20 +318,36 @@ public class HardcoreRegionDifficultyForge {
         } else {
             sb.append(" -> below the thresholds, no spawner level");
         }
+        if (!r.enemiesEnabled()) {
+            sb.append("\nEnemies: analysis is off (analyze_enemies: false).");
+            return;
+        }
+        // the number of hostile mobs around moves all the time: this line explains a level that changes by itself
+        sb.append("\nHostile mobs within ").append(r.enemyRadius()).append(" blocks: ").append(r.enemyCount());
+        if (r.enemyLevel() > 0) {
+            sb.append(" -> enemy level ").append(r.enemyLevel())
+              .append(r.enemyDecisive() ? " (decides the level here)" : " (not the highest, " + r.overall().regionName
+                      + " level " + r.overall().difficultyLevel + " wins)");
+        } else {
+            sb.append(" -> below the thresholds, no enemy level");
+        }
     }
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        dispatcher.register(HrdCommands.build());
         dispatcher.register(Commands.literal("hrd")
                 .then(Commands.literal("reload")
                         .requires(source -> source.hasPermission(2))
                         .executes(ctx -> {
                             DifficultyConfig config = DifficultyConfig.getInstance();
-                            boolean ok = config != null && config.loadConfig();
+                            boolean configOk = config != null && config.loadConfig();
+                            boolean qualitiesOk = reloadQualities();
+                            boolean ok = configOk && qualitiesOk;
                             PlayerRegionTracker.clearAll();
                             DangerCache.clear();
-                            if (ok) runAutoScan(ctx.getSource().getServer());
+                            if (configOk) runAutoScan(ctx.getSource().getServer());
                             ctx.getSource().sendSuccess(() -> Component.literal(ok
                                     ? "Hardcore Region Difficulty config reloaded."
                                     : "Could not read the config file - previous settings kept. See the log."), true);
@@ -348,15 +394,100 @@ public class HardcoreRegionDifficultyForge {
                                     : match.region().getRegionName() + " - " + match.region().getDifficultyTitle()
                                       + " (level " + match.region().getDifficultyLevel() + ", region id: " + match.region().getId() + ")"
                                       + (match.structureName().isEmpty() ? "" : " in " + match.structureName());
-                            ctx.getSource().sendSuccess(() -> Component.literal(text), false);
+                            var cfgNow = org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig.getInstance();
+                            String capText = "";
+                            if (cfgNow != null) {
+                                int base = LocationMatcher.dimensionBaseLevel(player.level(), cfgNow);
+                                int cap = cfgNow.getScalingSettings().levelCapFor(player.level().dimension().location(), base);
+                                capText = "\nDimension level " + base + ", cap here: "
+                                        + (cap == Integer.MAX_VALUE ? "none" : String.valueOf(cap))
+                                        + " (bonus +" + cfgNow.getScalingSettings().getDimensionLevelBonus()
+                                        + ", highest level of the mod " + cfgNow.getScalingSettings().maxRegionLevel() + ")";
+                            }
+                            StringBuilder full = new StringBuilder(text).append(capText);
+                            appendSpawnerInfo(full, ctx.getSource());
+                            final String shown = full.toString();
+                            ctx.getSource().sendSuccess(() -> Component.literal(shown), false);
                             return 1;
                         }))
+                .then(Commands.literal("regionshow")
+                        .executes(ctx -> showRegionIds(ctx.getSource())))
                 .then(buildQualityCommand()));
     }
 
     // ------------------------------------------------------------------
+    // /hrd regionshow: ids of the dimension, biome (and its tags) and structures at the player's feet.
+    // Every id is click-to-copy, ready to paste into the region editor / config.
+    // ------------------------------------------------------------------
+
+    private static MutableComponent copyable(String text) {
+        return Component.literal(text).withStyle(style -> style
+                .withColor(net.minecraft.ChatFormatting.AQUA)
+                .withUnderlined(true)
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                        net.minecraft.network.chat.ClickEvent.Action.COPY_TO_CLIPBOARD, text))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                        net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                        Component.translatableWithFallback("hardcore_region_difficulty.regionshow.copy",
+                                "Click to copy: %s", text))));
+    }
+
+    private static MutableComponent label(String key, String fallback) {
+        return Component.translatableWithFallback(key, fallback).withStyle(net.minecraft.ChatFormatting.GOLD);
+    }
+
+    private static int showRegionIds(CommandSourceStack source) throws CommandSyntaxException {
+        ServerPlayer player = source.getPlayerOrException();
+        ServerLevel level = player.serverLevel();
+        net.minecraft.core.BlockPos pos = player.blockPosition();
+        String K = "hardcore_region_difficulty.regionshow.";
+
+        MutableComponent out = Component.translatableWithFallback(K + "title", "Where you stand (click an id to copy it):")
+                .withStyle(net.minecraft.ChatFormatting.YELLOW);
+
+        out.append("\n").append(label(K + "dimension", "Dimension: "))
+           .append(copyable(level.dimension().location().toString()));
+
+        var biome = level.getBiome(pos);
+        var biomeKey = biome.unwrapKey();
+        out.append("\n").append(label(K + "biome", "Biome: "));
+        if (biomeKey.isPresent()) {
+            out.append(copyable(biomeKey.get().location().toString()));
+            List<String> tags = new ArrayList<>();
+            biome.tags().forEach(t -> tags.add("#" + t.location()));
+            java.util.Collections.sort(tags);
+            if (!tags.isEmpty()) {
+                out.append("\n  ").append(label(K + "biome_tags", "Biome tags: "));
+                for (int i = 0; i < tags.size(); i++) {
+                    if (i > 0) out.append(Component.literal(", ").withStyle(net.minecraft.ChatFormatting.GRAY));
+                    out.append(copyable(tags.get(i)));
+                }
+            }
+        } else {
+            out.append(Component.literal("?").withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+
+        var hits = org.Bacontete.hardcore_region_difficulty.common.difficulty.StructureLookup.at(level, pos);
+        out.append("\n").append(label(K + "structures", "Structures: "));
+        if (hits.isEmpty()) {
+            out.append(Component.translatableWithFallback(K + "none", "none here").withStyle(net.minecraft.ChatFormatting.GRAY));
+        }
+        for (var hit : hits) {
+            out.append("\n  ").append(copyable(hit.id().toString()));
+            List<String> tags = new ArrayList<>();
+            hit.holder().tags().forEach(t -> tags.add("#" + t.location()));
+            java.util.Collections.sort(tags);
+            for (String tag : tags) {
+                out.append(Component.literal("  ")).append(copyable(tag));
+            }
+        }
+
+        source.sendSuccess(() -> out, false);
+        return 1;
+    }
+
+    // ------------------------------------------------------------------
     // /hrd quality show [category]
-    // /hrd quality set <quality>
     // /hrd quality set <category> <quality>
     // Categories: weapon, tool, armor, ranged, shield
     // ------------------------------------------------------------------
@@ -376,14 +507,40 @@ public class HardcoreRegionDifficultyForge {
                                     }
                                     return showQualities(ctx.getSource(), category);
                                 })))
+                .then(Commands.literal("reload")
+                        .requires(source -> source.hasPermission(2))
+                        .executes(ctx -> {
+                            boolean ok = reloadQualities();
+                            ctx.getSource().sendSuccess(() -> Component.literal(ok
+                                    ? "Quality definitions reloaded from " + QualityRegistry.FILE_NAME + "."
+                                    : "Could not read the quality file - previous definitions kept. See the log."), true);
+                            return ok ? 1 : 0;
+                        }))
                 .then(Commands.literal("set")
                         .requires(source -> source.hasPermission(2))
-                        .then(Commands.argument("first", StringArgumentType.word())
-                                .executes(ctx -> setQuality(ctx, null, StringArgumentType.getString(ctx, "first")))
+                        .then(Commands.argument("category", StringArgumentType.word())
+                                .suggests((ctx, builder) -> suggestNames(QualityCategory.COMMAND_NAMES, builder))
                                 .then(Commands.argument("quality", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggestQualityArgument(ctx, builder))
                                         .executes(ctx -> setQuality(ctx,
-                                                StringArgumentType.getString(ctx, "first"),
+                                                StringArgumentType.getString(ctx, "category"),
                                                 StringArgumentType.getString(ctx, "quality"))))));
+    }
+
+    /** /hrd quality set <category> <quality>: only the qualities of the category that was chosen first. */
+    private static CompletableFuture<Suggestions> suggestQualityArgument(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+        QualityCategory category = QualityCategory.parse(StringArgumentType.getString(ctx, "category"));
+        if (category == null) return builder.buildFuture();
+        String typed = builder.getRemainingLowerCase();
+        List<QualityType> list = new ArrayList<>(category.getAllowed());
+        list.sort(Comparator.comparingInt(QualityType::getTier));
+        for (QualityType type : list) {
+            if (type.name().toLowerCase(Locale.ROOT).startsWith(typed)) {
+                // the tooltip is translated by the client: Vietnamese names with vi_vn
+                builder.suggest(type.name(), type.getDisplayName());
+            }
+        }
+        return builder.buildFuture();
     }
 
     private static CompletableFuture<Suggestions> suggestNames(List<String> names, SuggestionsBuilder builder) {
@@ -397,13 +554,7 @@ public class HardcoreRegionDifficultyForge {
     }
 
     private static QualityType parseQuality(String qualityName, QualityCategory category) {
-        String upper = qualityName.toUpperCase(Locale.ROOT);
-        for (QualityType type : category.getAllowed()) {
-            if (type.name().equals(upper)) {
-                return type;
-            }
-        }
-        return null;
+        return category.find(qualityName);
     }
 
     private static String unknownCategoryMessage(String name) {
@@ -412,20 +563,51 @@ public class HardcoreRegionDifficultyForge {
 
     private static int showQualities(CommandSourceStack source, QualityCategory only) {
         MutableComponent result = Component.literal(only == null
-                ? "Quality Types per item category (lowest to highest):\n"
+                ? "Quality Types per item category (lowest to highest, from " + QualityRegistry.FILE_NAME + "):\n"
                 : "Quality Types for one item category (lowest to highest):\n");
         for (QualityCategory category : QualityCategory.values()) {
             if (only != null && category != only) {
                 continue;
             }
             result.append(Component.literal(category.name().toLowerCase(Locale.ROOT))
-                    .withStyle(net.minecraft.ChatFormatting.BOLD)).append(Component.literal(":\n"));
+                    .withStyle(net.minecraft.ChatFormatting.BOLD))
+                  .append(Component.literal(" (").withStyle(net.minecraft.ChatFormatting.GRAY))
+                  .append(Component.translatable("hardcore_region_difficulty.quality.category." + category.name())
+                          .withStyle(net.minecraft.ChatFormatting.GRAY))
+                  .append(Component.literal("):\n").withStyle(net.minecraft.ChatFormatting.GRAY));
             List<QualityType> list = new ArrayList<>(category.getAllowed());
             list.sort(Comparator.comparingInt(QualityType::getTier));
+            if (list.isEmpty()) {
+                result.append(Component.literal("  (none - this category has no qualities)\n"));
+            }
+            double weightTotal = 0.0D;
+            for (QualityType q : list) {
+                if (q instanceof QualityDefinition d) weightTotal += d.getWeight();
+            }
             for (QualityType type : list) {
+                String weight = "";
+                if (type instanceof QualityDefinition d) {
+                    // loot / mob drops / villagers: the weight of the quality file (a 0-weight high quality unlocks at a level)
+                    String loot;
+                    if (d.getWeight() > 0) {
+                        loot = String.format(Locale.ROOT, "%.2f", weightTotal > 0 ? d.getWeight() * 100.0D / weightTotal : 0.0D) + "%";
+                    } else if (d.getUnlockLevel() > 0) {
+                        loot = "from Lv " + d.getUnlockLevel();
+                    } else {
+                        loot = "0.00%";
+                    }
+                    // Quality Forge / newly crafted items: chance by tier only (ignores the file weights)
+                    String crafted = String.format(Locale.ROOT, "%.2f", ItemQuality.forgeChancePercent(d)) + "%";
+                    weight = ", loot " + loot + ", crafted " + crafted;
+                }
+                // id (what you type in commands) + the colored display name; the client translates it, so it is
+                // Vietnamese with vi_vn and the prettified English name otherwise
                 result.append(Component.literal("  ")
-                        .append(Component.literal(type.name()).withStyle(type.getColor()))
-                        .append(Component.literal(" (tier " + type.getTier() + ")\n")));
+                        .append(Component.literal(type.name()).withStyle(type.getStyle()))
+                        .append(Component.literal(" -> ").withStyle(net.minecraft.ChatFormatting.DARK_GRAY))
+                        .append(type.getDisplayName())
+                        .append(Component.literal(" (tier " + type.getTier() + weight + ")\n")
+                                .withStyle(net.minecraft.ChatFormatting.GRAY)));
             }
         }
         source.sendSuccess(() -> result, false);
@@ -436,13 +618,10 @@ public class HardcoreRegionDifficultyForge {
             throws CommandSyntaxException {
         CommandSourceStack source = ctx.getSource();
 
-        QualityCategory wanted = null;
-        if (categoryName != null) {
-            wanted = QualityCategory.parse(categoryName);
-            if (wanted == null) {
-                source.sendFailure(Component.literal(unknownCategoryMessage(categoryName)));
-                return 0;
-            }
+        QualityCategory wanted = QualityCategory.parse(categoryName);
+        if (wanted == null) {
+            source.sendFailure(Component.literal(unknownCategoryMessage(categoryName)));
+            return 0;
         }
 
         ServerPlayer player = source.getPlayerOrException();
@@ -457,7 +636,7 @@ public class HardcoreRegionDifficultyForge {
             source.sendFailure(Component.literal("The held item cannot have a quality."));
             return 0;
         }
-        if (wanted != null && category != wanted) {
+        if (category != wanted) {
             source.sendFailure(Component.literal("The held item is a " + category.name().toLowerCase(Locale.ROOT)
                     + ", not a " + wanted.name().toLowerCase(Locale.ROOT) + "."));
             return 0;

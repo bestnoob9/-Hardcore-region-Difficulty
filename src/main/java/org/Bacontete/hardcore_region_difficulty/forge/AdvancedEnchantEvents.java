@@ -124,18 +124,203 @@ public class AdvancedEnchantEvents {
         }
     }
 
+    private static boolean isModEnchant(net.minecraft.world.item.enchantment.Enchantment enchantment) {
+        var key = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS.getKey(enchantment);
+        return key != null && key.getNamespace().equals(
+                org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty.MODID);
+    }
+
+    private static boolean isBlockedEnchant(net.minecraft.world.item.enchantment.Enchantment enchantment,
+                                            java.util.Map<net.minecraft.world.item.enchantment.Enchantment, Integer> leftEnchants) {
+        var key = net.minecraftforge.registries.ForgeRegistries.ENCHANTMENTS.getKey(enchantment);
+        return key != null
+                && key.getNamespace().equals(org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty.MODID)
+                && !AdvancedEnchantments.isEnabled(enchantment)
+                && leftEnchants.get(enchantment) == null;
+    }
+
+    /**
+     * A switched-off enchantment of this mod can no longer be applied (anvil), only kept on items that have it.
+     * Only that enchantment is skipped: the other enchantments of the same book still get applied
+     * (the event used to be cancelled, which blocked the whole anvil result).
+     * Also: True Damage replaces Armor Piercing (any level) already on the item, and every enchant of this mod
+     * (Advanced Sharpness, Advanced Protection...) replaces the normal enchants it is not compatible with.
+     * In these special cases the result is built here, mirroring vanilla (AnvilMenu): material repair,
+     * durability merge of two identical items, enchant merge, rename and XP cost.
+     */
     @SubscribeEvent
-    public void onAnvilUpdate(AnvilUpdateEvent event) {
-        if (!AdvancedEnchantments.SWIFT_STRIKE.isPresent()) {
+    public void onAnvilDisabledEnchant(AnvilUpdateEvent event) {
+        ItemStack left = event.getLeft();
+        ItemStack right = event.getRight();
+        var leftEnchants = EnchantmentHelper.getEnchantments(left);
+        var rightEnchants = EnchantmentHelper.getEnchantments(right);
+        boolean anyBlocked = false;
+        for (var enchantment : rightEnchants.keySet()) {
+            if (isBlockedEnchant(enchantment, leftEnchants)) {
+                anyBlocked = true;
+                break;
+            }
+        }
+        // True Damage pushes Armor Piercing (any level) off the item instead of being refused.
+        boolean replacesPiercing = AdvancedEnchantments.TRUE_DAMAGE.isPresent()
+                && AdvancedEnchantments.ARMOR_PIERCING.isPresent()
+                && rightEnchants.containsKey(AdvancedEnchantments.TRUE_DAMAGE.get())
+                && leftEnchants.containsKey(AdvancedEnchantments.ARMOR_PIERCING.get())
+                && AdvancedEnchantments.isEnabled(AdvancedEnchantments.TRUE_DAMAGE);
+        // An enchant of this mod (Advanced Sharpness, Advanced Protection...) pushes the normal enchants it is not
+        // compatible with (Sharpness / Smite / Bane, Protection...) off the item instead of being refused.
+        boolean pushesOutNormal = false;
+        for (var enchantment : rightEnchants.keySet()) {
+            if (isModEnchant(enchantment) && AdvancedEnchantments.isEnabled(enchantment)) {
+                for (var other : leftEnchants.keySet()) {
+                    if (other != enchantment && !isModEnchant(other) && !enchantment.isCompatibleWith(other)) {
+                        pushesOutNormal = true;
+                    }
+                }
+            }
+        }
+        if (!anyBlocked && !replacesPiercing && !pushesOutNormal) {
             return;
         }
-        var swift = AdvancedEnchantments.SWIFT_STRIKE.get();
-        if (EnchantmentHelper.getEnchantments(event.getRight()).containsKey(swift)
-                && AdvancedEnchantments.levelOf(event.getLeft(), AdvancedEnchantments.SWIFT_STRIKE) == 0
-                && !swift.canEnchant(event.getLeft())) {
+        if (left.isEmpty() || right.isEmpty()) {
             event.setCanceled(true);
+            return;
         }
+        boolean rightIsBook = right.is(net.minecraft.world.item.Items.ENCHANTED_BOOK)
+                && !net.minecraft.world.item.EnchantedBookItem.getEnchantments(right).isEmpty();
+        boolean leftIsBook = left.is(net.minecraft.world.item.Items.ENCHANTED_BOOK);
+
+        ItemStack output = left.copy();
+        var result = new java.util.LinkedHashMap<>(leftEnchants);
+        long baseCost = (long) left.getBaseRepairCost() + right.getBaseRepairCost();
+        int extra = 0;
+        int renameCost = 0;
+        int materialCost = 0;
+
+        if (output.isDamageableItem() && output.getItem().isValidRepairItem(left, right)) {
+            // Repair with the material (e.g. iron ingots on an iron sword): 25% of max durability per unit.
+            int step = Math.min(output.getDamageValue(), output.getMaxDamage() / 4);
+            if (step <= 0) {
+                event.setCanceled(true);
+                return;
+            }
+            int used;
+            for (used = 0; step > 0 && used < right.getCount(); used++) {
+                output.setDamageValue(output.getDamageValue() - step);
+                extra++;
+                step = Math.min(output.getDamageValue(), output.getMaxDamage() / 4);
+            }
+            materialCost = used;
+        } else {
+            if (!rightIsBook && (!output.is(right.getItem()) || !output.isDamageableItem())) {
+                event.setCanceled(true);
+                return;
+            }
+            if (output.isDamageableItem() && !rightIsBook) {
+                // Merge the durability of two identical items (+12% bonus).
+                int leftLeft = left.getMaxDamage() - left.getDamageValue();
+                int rightLeft = right.getMaxDamage() - right.getDamageValue();
+                int bonus = rightLeft + output.getMaxDamage() * 12 / 100;
+                int newDamage = Math.max(0, output.getMaxDamage() - (leftLeft + bonus));
+                if (newDamage < output.getDamageValue()) {
+                    output.setDamageValue(newDamage);
+                    extra += 2;
+                }
+            }
+            boolean applied = false;
+            boolean failed = false;
+            for (var entry : rightEnchants.entrySet()) {
+                var enchantment = entry.getKey();
+                if (isBlockedEnchant(enchantment, leftEnchants)) {
+                    failed = true;
+                    continue;
+                }
+                int current = result.getOrDefault(enchantment, 0);
+                int level = entry.getValue();
+                level = current == level ? level + 1 : Math.max(level, current);
+                level = Math.min(level, enchantment.getMaxLevel());
+                boolean canApply = leftIsBook || enchantment.canEnchant(left);
+                if (canApply && replacesPiercing && enchantment == AdvancedEnchantments.TRUE_DAMAGE.get()) {
+                    result.remove(AdvancedEnchantments.ARMOR_PIERCING.get());
+                }
+                if (canApply && isModEnchant(enchantment) && AdvancedEnchantments.isEnabled(enchantment)) {
+                    result.keySet().removeIf(other -> other != enchantment && !isModEnchant(other)
+                            && !enchantment.isCompatibleWith(other));
+                }
+                for (var other : result.keySet()) {
+                    if (other != enchantment && !enchantment.isCompatibleWith(other)) {
+                        canApply = false;
+                        extra++;
+                    }
+                }
+                if (!canApply) {
+                    failed = true;
+                    continue;
+                }
+                int multiplier = switch (enchantment.getRarity()) {
+                    case COMMON -> 1;
+                    case UNCOMMON -> 2;
+                    case RARE -> 4;
+                    case VERY_RARE -> 8;
+                };
+                if (rightIsBook) {
+                    multiplier = Math.max(1, multiplier / 2);
+                }
+                result.put(enchantment, level);
+                extra += multiplier * level;
+                applied = true;
+            }
+            if (failed && !applied) {
+                event.setCanceled(true);
+                return;
+            }
+        }
+
+        // Rename, like vanilla.
+        String name = event.getName();
+        if (name == null || name.isBlank()) {
+            if (left.hasCustomHoverName()) {
+                renameCost = 1;
+                extra += 1;
+                output.resetHoverName();
+            }
+        } else if (!name.equals(left.getHoverName().getString())) {
+            renameCost = 1;
+            extra += 1;
+            output.setHoverName(net.minecraft.network.chat.Component.literal(name));
+        }
+
+        if (leftIsBook == false && rightIsBook && !output.isBookEnchantable(right)) {
+            event.setCanceled(true);
+            return;
+        }
+        if (extra <= 0) {
+            event.setCanceled(true);
+            return;
+        }
+        long cost = baseCost + extra;
+        if (renameCost == extra && renameCost > 0 && cost >= 40) {
+            cost = 39;
+        }
+        boolean creative = event.getPlayer() != null && event.getPlayer().getAbilities().instabuild;
+        if (cost >= 40 && !creative) {
+            event.setCanceled(true);
+            return;
+        }
+        int repairCost = Math.max(output.getBaseRepairCost(), right.getBaseRepairCost());
+        if (renameCost != extra || renameCost == 0) {
+            repairCost = repairCost * 2 + 1;
+        }
+        output.setRepairCost(repairCost);
+        EnchantmentHelper.setEnchantments(result, output);
+        event.setOutput(output);
+        event.setCost((int) cost);
+        event.setMaterialCost(materialCost > 0 ? materialCost : 1);
     }
+
+    // NOTE: the old onAnvilUpdate handler cancelled the whole anvil operation whenever the right-hand item
+    // carried Swift Strike and the left-hand item could not take it (any sword, any enchanted book).
+    // Vanilla already skips an enchantment that cannot be applied and still applies the others, so no handler is needed.
 
     @SubscribeEvent
     public void onItemAttributes(ItemAttributeModifierEvent event) {

@@ -10,7 +10,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public final class SmartAutoSettings {
-    private static final int MAX_LEVEL = 10;
+    /** Smart scan can rate up to the highest level a player can create (own levels 6-98). */
+    private static final int MAX_LEVEL = ScalingSettings.ABSOLUTE_MAX_LEVEL;
 
     public static final int DEFAULT_SPAWNER_SCAN_RADIUS = 48;
 
@@ -45,6 +46,11 @@ public final class SmartAutoSettings {
 
     private final TreeMap<Integer, Integer> enemyLevelThresholds;
     private final boolean analyzeDimensions;
+    /**
+     * When true (default), the spawner / enemy thresholds continue by themselves for the levels the player adds
+     * above the last threshold (the last step is repeated), so a new level is reachable by smart scan at once.
+     */
+    private boolean autoExtendThresholds = true;
     private final int unknownDimensionLevel;
     private final Map<String, Integer> dimensionLevels;
 
@@ -111,11 +117,13 @@ public final class SmartAutoSettings {
 
         boolean dimensions = bool(obj, "analyze_dimensions", true);
         int unknownDimension = intOf(obj, "unknown_dimension_level", DEFAULT_UNKNOWN_DIMENSION_LEVEL);
-        return new SmartAutoSettings(structures, biomes, unknown, spawn,
+        SmartAutoSettings result = new SmartAutoSettings(structures, biomes, unknown, spawn,
                 levels(obj, "structure_levels"), levels(obj, "biome_levels"),
                 spawners, radius, spawnerThresholds(obj),
                 enemies, enemyRadius, enemyThresholds(obj),
                 dimensions, unknownDimension, levels(obj, "dimension_levels"));
+        result.autoExtendThresholds = bool(obj, "auto_extend_thresholds", true);
+        return result;
     }
 
     private static Map<Integer, Integer> spawnerThresholds(JsonObject obj) {
@@ -232,19 +240,63 @@ public final class SmartAutoSettings {
 
     public Map<Integer, Integer> enemyLevelThresholds() { return Collections.unmodifiableMap(enemyLevelThresholds); }
 
+    public boolean autoExtendThresholds() { return autoExtendThresholds; }
+
     public int spawnerLevelFor(int spawnerCount) {
+        return levelFor(spawnerLevelThresholds, spawnerCount);
+    }
+
+    public int enemyLevelFor(int enemyCount) {
+        return levelFor(enemyLevelThresholds, enemyCount);
+    }
+
+    /** Spawner thresholds including the levels added by auto_extend_thresholds (what smart scan really uses). */
+    public Map<Integer, Integer> effectiveSpawnerThresholds() { return effective(spawnerLevelThresholds); }
+
+    /** Enemy thresholds including the levels added by auto_extend_thresholds. */
+    public Map<Integer, Integer> effectiveEnemyThresholds() { return effective(enemyLevelThresholds); }
+
+    private int levelFor(TreeMap<Integer, Integer> thresholds, int count) {
         int level = 0;
-        for (Map.Entry<Integer, Integer> e : spawnerLevelThresholds.entrySet()) {
-            if (spawnerCount >= e.getValue()) level = Math.max(level, e.getKey());
+        for (Map.Entry<Integer, Integer> e : thresholds.entrySet()) {
+            if (count >= e.getValue()) level = Math.max(level, e.getKey());
+        }
+        if (!autoExtendThresholds || thresholds.isEmpty()) return level;
+        int top = thresholds.lastKey();
+        int topCount = thresholds.get(top);
+        int step = stepOf(thresholds);
+        int max = highestLevel();
+        for (int lvl = top + 1; lvl <= max; lvl++) {
+            if (count >= topCount + (long) step * (lvl - top)) level = lvl;
+            else break;
         }
         return level;
     }
 
-    public int enemyLevelFor(int enemyCount) {
-        int level = 0;
-        for (Map.Entry<Integer, Integer> e : enemyLevelThresholds.entrySet()) {
-            if (enemyCount >= e.getValue()) level = Math.max(level, e.getKey());
+    private Map<Integer, Integer> effective(TreeMap<Integer, Integer> thresholds) {
+        TreeMap<Integer, Integer> out = new TreeMap<>(thresholds);
+        if (!autoExtendThresholds || thresholds.isEmpty()) return Collections.unmodifiableMap(out);
+        int top = thresholds.lastKey();
+        int topCount = thresholds.get(top);
+        int step = stepOf(thresholds);
+        for (int lvl = top + 1; lvl <= highestLevel(); lvl++) {
+            out.put(lvl, (int) Math.min(Integer.MAX_VALUE, topCount + (long) step * (lvl - top)));
         }
-        return level;
+        return Collections.unmodifiableMap(out);
+    }
+
+    /** Count added per extra level: the gap between the last two thresholds (at least 1). */
+    private static int stepOf(TreeMap<Integer, Integer> thresholds) {
+        Integer prev = thresholds.lowerKey(thresholds.lastKey());
+        int topCount = thresholds.get(thresholds.lastKey());
+        int step = prev == null ? topCount : topCount - thresholds.get(prev);
+        return Math.max(1, step);
+    }
+
+    /** Highest level of the mod right now (5, or the highest level the player created). */
+    private static int highestLevel() {
+        DifficultyConfig config = DifficultyConfig.getInstance();
+        int max = config == null ? ScalingSettings.BUILT_IN_MAX_LEVEL : config.getScalingSettings().maxRegionLevel();
+        return Math.max(ScalingSettings.BUILT_IN_MAX_LEVEL, max);
     }
 }

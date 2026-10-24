@@ -6,6 +6,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.AABB;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
+import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
+import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyIcons;
 import org.Bacontete.hardcore_region_difficulty.common.network.BossTitlePacket;
 import org.Bacontete.hardcore_region_difficulty.forge.NetworkHandler;
 
@@ -17,10 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 
 public class BossProximityWarning {
-
-    private static final int BOSS_DETECTION_RADIUS = 64;
-
-    private static final int MINI_BOSS_DETECTION_RADIUS = 48;
 
     private static final int LEAVE_MARGIN = 8;
 
@@ -34,26 +32,22 @@ public class BossProximityWarning {
         Set<UUID> before = IN_RANGE.getOrDefault(player.getUUID(), Collections.emptySet());
         Set<UUID> now = new HashSet<>();
         Mob announce = null;
-        int announceLevel = 0;
+        BossLevel announceLevel = null;
         double announceDistance = Double.MAX_VALUE;
 
-        AABB searchBox = player.getBoundingBox().inflate(BOSS_DETECTION_RADIUS + LEAVE_MARGIN);
+        AABB searchBox = player.getBoundingBox().inflate(BossLevel.maxDetectionRadius() + LEAVE_MARGIN);
         for (Mob mob : player.level().getEntitiesOfClass(Mob.class, searchBox)) {
             if (!mob.isAlive()) {
                 continue;
             }
 
-            EntityType<?> type = mob.getType();
-            if (type == EntityType.ENDER_DRAGON || type == EntityType.WITHER || type == EntityType.WARDEN) {
-                continue;
-            }
-            int bossLevel = BossDetector.getBossDifficultyLevel(mob);
-            if (bossLevel <= 0) {
+            BossLevel bossLevel = BossDetector.getBossLevel(mob);
+            if (bossLevel == null) {
                 continue;
             }
 
             boolean wasInRange = before.contains(mob.getUUID());
-            int radius = (bossLevel == 7 ? BOSS_DETECTION_RADIUS : MINI_BOSS_DETECTION_RADIUS)
+            int radius = bossLevel.detectionRadius()
                     + (wasInRange ? LEAVE_MARGIN : 0);
             double distance = player.distanceTo(mob);
             if (distance > radius) {
@@ -61,7 +55,7 @@ public class BossProximityWarning {
             }
 
             now.add(mob.getUUID());
-            if (!wasInRange && (bossLevel > announceLevel
+            if (!wasInRange && (announceLevel == null || bossLevel.compareTo(announceLevel) > 0
                     || (bossLevel == announceLevel && distance < announceDistance))) {
                 announce = mob;
                 announceLevel = bossLevel;
@@ -80,12 +74,15 @@ public class BossProximityWarning {
         }
     }
 
-    private static void sendBossTitle(ServerPlayer player, Mob mob, int bossLevel) {
-        String bossTypeKey = bossLevel == 7 ? "hardcore_region_difficulty.boss.boss" : "hardcore_region_difficulty.boss.mini_boss";
+    private static void sendBossTitle(ServerPlayer player, Mob mob, BossLevel bossLevel) {
         String entityName = mob.getType().getDescription().getString();
 
-        NetworkHandler.sendToPlayer(player, new BossTitlePacket(entityName, bossTypeKey, bossLevel));
-        HardcoreRegionDifficulty.LOGGER.debug("Boss title sent to {} for {} (level {})",
+        // icon / color of the boss class from its "difficulty_levels" entry (see BossLevel#configLevel)
+        DifficultyConfig cfg = DifficultyConfig.getInstance();
+        String icon = cfg == null ? "" : cfg.levelIcon(bossLevel.configLevel());
+        int color = cfg == null ? -1 : DifficultyIcons.parseColorRgb(cfg.levelColor(bossLevel.configLevel()));
+        NetworkHandler.sendToPlayer(player, new BossTitlePacket(entityName, bossLevel, icon, color));
+        HardcoreRegionDifficulty.LOGGER.debug("Boss title sent to {} for {} ({})",
                 player.getName().getString(), entityName, bossLevel);
     }
 

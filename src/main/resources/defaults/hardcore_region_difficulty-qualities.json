@@ -1,0 +1,874 @@
+{
+  "_readme": [
+    "Hardcore Region Difficulty - quality definitions. Edit, delete or add entries; then run /hrd quality reload (or just save: the server reloads it automatically).",
+    "Each category (weapon, tool, armor, ranged, shield) has its own list. Delete an entry to remove that quality. An empty list [] disables qualities for that category. A missing category uses the built-in defaults.",
+    "id: unique per category, A-Z 0-9 _ only (stored on items). name: optional display name (plain text or a lang key); without it the lang file / the id is used.",
+    "color: a vanilla color name (gold, dark_purple, aqua, ...) or a hex code like #FF8800.",
+    "tier: whole number from tier_min to tier_max (default -5..5, change both below). Used for sorting and for the default weight_group (negative < 0, neutral = 0, positive = 1, high >= 2). Optional. A tier outside the limits is clamped. The quality with tier 0 is the 'standard' one (villagers at a low level sell it).",
+    "weight: relative roll chance (only the ratio inside a category matters; the in-game editor shows it as a % and saves % x 100, e.g. 12.5% = 1250). weight_group: negative (less likely in dangerous regions), neutral (unchanged), positive (more likely), high (more likely, uses high_tier_bonus_multiplier).",
+    "Weights are only used by loot / mob drops / villagers / inventory (scaled by the region or villager level). The Quality Forge and crafted / inventory items ignore weights and levels: the chance depends only on the tier (your own qualities are balanced automatically: the share of a tier is split equally between all qualities of that tier; standard is the likeliest, bad qualities are likelier than good ones, higher tier = rarer; Mythic, Divine, Flawless included), and Luck (Potion of Luck, luck_quality_bonus in the config) tilts it toward the good ones. An old forge_weight is ignored.",
+    "unlock_level: for weight 0 entries in group high: appears from that difficulty level if 'unlock_high_qualities' is on. 0 = never.",
+    "effects: percents are fractions (0.10 = +10%); armor_bonus / reach are flat. Only the keys listed for the category are used (weapon: damage, attack_speed, durability, reach | tool: damage, attack_speed, durability, mining_speed, reach | armor: armor, durability, armor_bonus | ranged: arrow_damage, draw_speed, durability | shield: durability, armor_bonus, move_speed, hold_mining). Other keys are ignored.",
+    "strict_limits: true = clamp percents to -0.20..+0.20, reach to -0.5..+0.5 and armor_bonus to -0.5..+1.5 (the original balance limits)."
+  ],
+  "strict_limits": false,
+  "tier_min": -5,
+  "tier_max": 5,
+  "_example_custom_quality (copy into a category list to use it)": {
+    "id": "BLOODFORGED",
+    "name": "Bloodforged",
+    "color": "#C1121F",
+    "tier": 2,
+    "weight": 4,
+    "weight_group": "high",
+    "effects": {
+      "damage": 0.12,
+      "attack_speed": -0.05,
+      "durability": 0.1,
+      "reach": 0.3
+    }
+  },
+  "categories": {
+    "weapon": [
+      {
+        "id": "DAMAGED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.2,
+          "attack_speed": -0.2,
+          "durability": -0.2,
+          "reach": -0.5
+        }
+      },
+      {
+        "id": "CRACKED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.17,
+          "attack_speed": -0.14,
+          "durability": -0.18,
+          "reach": -0.4
+        }
+      },
+      {
+        "id": "RUSTED",
+        "color": "dark_red",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.14,
+          "attack_speed": -0.1,
+          "durability": -0.16,
+          "reach": -0.3
+        }
+      },
+      {
+        "id": "CHIPPED",
+        "color": "red",
+        "tier": -1,
+        "weight": 10,
+        "weight_group": "negative",
+        "effects": {
+          "damage": 0.05,
+          "attack_speed": -0.12,
+          "durability": -0.15
+        }
+      },
+      {
+        "id": "WORN",
+        "color": "gray",
+        "tier": -1,
+        "weight": 12,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.08,
+          "attack_speed": 0.03,
+          "durability": -0.1
+        }
+      },
+      {
+        "id": "STANDARD",
+        "color": "white",
+        "tier": 0,
+        "weight": 50,
+        "weight_group": "neutral",
+        "effects": {}
+      },
+      {
+        "id": "POLISHED",
+        "color": "aqua",
+        "tier": 1,
+        "weight": 15,
+        "weight_group": "positive",
+        "effects": {
+          "damage": 0.04,
+          "attack_speed": 0.06,
+          "durability": -0.04,
+          "reach": 0.1
+        }
+      },
+      {
+        "id": "REFINED",
+        "color": "blue",
+        "tier": 1,
+        "weight": 10,
+        "weight_group": "positive",
+        "effects": {
+          "damage": 0.06,
+          "attack_speed": -0.02,
+          "durability": 0.06,
+          "reach": 0.15
+        }
+      },
+      {
+        "id": "SUPERIOR",
+        "color": "green",
+        "tier": 2,
+        "weight": 6,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.09,
+          "attack_speed": 0.07,
+          "durability": 0.02,
+          "reach": 0.2
+        }
+      },
+      {
+        "id": "MASTERWORK",
+        "color": "dark_green",
+        "tier": 2,
+        "weight": 3,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.11,
+          "attack_speed": 0.09,
+          "durability": 0.11,
+          "reach": 0.25
+        }
+      },
+      {
+        "id": "EPIC",
+        "color": "light_purple",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.14,
+          "attack_speed": 0.11,
+          "durability": 0.13,
+          "reach": 0.3
+        }
+      },
+      {
+        "id": "LEGENDARY",
+        "color": "gold",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.16,
+          "attack_speed": 0.13,
+          "durability": 0.15,
+          "reach": 0.35
+        }
+      },
+      {
+        "id": "MYTHIC",
+        "color": "dark_purple",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 4,
+        "effects": {
+          "damage": 0.17,
+          "attack_speed": 0.15,
+          "durability": 0.16,
+          "reach": 0.4
+        }
+      },
+      {
+        "id": "DIVINE",
+        "color": "yellow",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "damage": 0.19,
+          "attack_speed": 0.16,
+          "durability": 0.18,
+          "reach": 0.45
+        }
+      },
+      {
+        "id": "FLAWLESS",
+        "color": "aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "damage": 0.2,
+          "attack_speed": 0.18,
+          "durability": 0.2,
+          "reach": 0.5
+        }
+      }
+    ],
+    "tool": [
+      {
+        "id": "CRACKED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.17,
+          "attack_speed": -0.14,
+          "durability": -0.18,
+          "mining_speed": -0.18,
+          "reach": -0.5
+        }
+      },
+      {
+        "id": "RUSTED",
+        "color": "dark_red",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.14,
+          "attack_speed": -0.1,
+          "durability": -0.16,
+          "mining_speed": -0.15,
+          "reach": -0.4
+        }
+      },
+      {
+        "id": "CRUMBLING",
+        "color": "dark_red",
+        "tier": -1,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.12,
+          "attack_speed": 0.03,
+          "durability": -0.15,
+          "mining_speed": -0.06,
+          "reach": -0.3
+        }
+      },
+      {
+        "id": "WORN",
+        "color": "gray",
+        "tier": -1,
+        "weight": 12,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.07,
+          "attack_speed": 0.03,
+          "durability": -0.1,
+          "mining_speed": -0.06
+        }
+      },
+      {
+        "id": "WEATHERED",
+        "color": "gray",
+        "tier": -1,
+        "weight": 10,
+        "weight_group": "negative",
+        "effects": {
+          "damage": -0.08,
+          "attack_speed": -0.06,
+          "durability": 0.04,
+          "mining_speed": -0.1,
+          "reach": 0.1
+        }
+      },
+      {
+        "id": "STANDARD",
+        "color": "white",
+        "tier": 0,
+        "weight": 50,
+        "weight_group": "neutral",
+        "effects": {}
+      },
+      {
+        "id": "POLISHED",
+        "color": "aqua",
+        "tier": 1,
+        "weight": 15,
+        "weight_group": "positive",
+        "effects": {
+          "damage": 0.04,
+          "attack_speed": 0.06,
+          "durability": -0.04,
+          "mining_speed": 0.04,
+          "reach": 0.1
+        }
+      },
+      {
+        "id": "REFINED",
+        "color": "blue",
+        "tier": 1,
+        "weight": 10,
+        "weight_group": "positive",
+        "effects": {
+          "damage": 0.06,
+          "attack_speed": -0.02,
+          "durability": 0.06,
+          "mining_speed": 0.05,
+          "reach": 0.15
+        }
+      },
+      {
+        "id": "SUPERIOR",
+        "color": "green",
+        "tier": 2,
+        "weight": 6,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.09,
+          "attack_speed": 0.07,
+          "durability": 0.02,
+          "mining_speed": 0.08,
+          "reach": 0.2
+        }
+      },
+      {
+        "id": "MASTERWORK",
+        "color": "dark_green",
+        "tier": 2,
+        "weight": 3,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.11,
+          "attack_speed": 0.09,
+          "durability": 0.11,
+          "mining_speed": 0.1,
+          "reach": 0.25
+        }
+      },
+      {
+        "id": "PRISTINE",
+        "color": "green",
+        "tier": 3,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "damage": 0.13,
+          "attack_speed": 0.12,
+          "durability": 0.15,
+          "mining_speed": 0.12,
+          "reach": 0.32
+        }
+      },
+      {
+        "id": "LEGENDARY",
+        "color": "gold",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "damage": 0.15,
+          "attack_speed": 0.12,
+          "durability": 0.14,
+          "mining_speed": 0.13,
+          "reach": 0.35
+        }
+      },
+      {
+        "id": "ANCIENT",
+        "color": "dark_aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "damage": 0.17,
+          "attack_speed": 0.17,
+          "durability": 0.18,
+          "mining_speed": 0.17,
+          "reach": 0.42
+        }
+      },
+      {
+        "id": "FLAWLESS",
+        "color": "aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "damage": 0.2,
+          "attack_speed": 0.18,
+          "durability": 0.2,
+          "mining_speed": 0.2,
+          "reach": 0.5
+        }
+      }
+    ],
+    "armor": [
+      {
+        "id": "DAMAGED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "armor": -0.2,
+          "durability": -0.2,
+          "armor_bonus": -0.5
+        }
+      },
+      {
+        "id": "CRACKED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "armor": -0.17,
+          "durability": -0.18,
+          "armor_bonus": -0.4
+        }
+      },
+      {
+        "id": "RUSTED",
+        "color": "dark_red",
+        "tier": -2,
+        "weight": 5,
+        "weight_group": "negative",
+        "effects": {
+          "armor": -0.14,
+          "durability": -0.16,
+          "armor_bonus": -0.3
+        }
+      },
+      {
+        "id": "CRUMBLING",
+        "color": "dark_red",
+        "tier": -1,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "armor": -0.12,
+          "durability": -0.15,
+          "armor_bonus": -0.2
+        }
+      },
+      {
+        "id": "WEATHERED",
+        "color": "gray",
+        "tier": -1,
+        "weight": 10,
+        "weight_group": "negative",
+        "effects": {
+          "armor": -0.08,
+          "durability": 0.04,
+          "armor_bonus": 0.1
+        }
+      },
+      {
+        "id": "STANDARD",
+        "color": "white",
+        "tier": 0,
+        "weight": 50,
+        "weight_group": "neutral",
+        "effects": {}
+      },
+      {
+        "id": "POLISHED",
+        "color": "aqua",
+        "tier": 1,
+        "weight": 15,
+        "weight_group": "positive",
+        "effects": {
+          "armor": 0.04,
+          "durability": -0.04,
+          "armor_bonus": 0.2
+        }
+      },
+      {
+        "id": "REFINED",
+        "color": "blue",
+        "tier": 1,
+        "weight": 10,
+        "weight_group": "positive",
+        "effects": {
+          "armor": 0.06,
+          "durability": 0.06,
+          "armor_bonus": 0.3
+        }
+      },
+      {
+        "id": "SUPERIOR",
+        "color": "green",
+        "tier": 2,
+        "weight": 6,
+        "weight_group": "high",
+        "effects": {
+          "armor": 0.09,
+          "durability": 0.05,
+          "armor_bonus": 0.4
+        }
+      },
+      {
+        "id": "MASTERWORK",
+        "color": "dark_green",
+        "tier": 2,
+        "weight": 3,
+        "weight_group": "high",
+        "effects": {
+          "armor": 0.11,
+          "durability": 0.11,
+          "armor_bonus": 0.6
+        }
+      },
+      {
+        "id": "PRISTINE",
+        "color": "green",
+        "tier": 3,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "armor": 0.14,
+          "durability": 0.14,
+          "armor_bonus": 0.85
+        }
+      },
+      {
+        "id": "EPIC",
+        "color": "light_purple",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "armor": 0.15,
+          "durability": 0.14,
+          "armor_bonus": 0.8
+        }
+      },
+      {
+        "id": "ANCIENT",
+        "color": "dark_aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "armor": 0.16,
+          "durability": 0.16,
+          "armor_bonus": 1.1
+        }
+      },
+      {
+        "id": "MYTHIC",
+        "color": "dark_purple",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 4,
+        "effects": {
+          "armor": 0.17,
+          "durability": 0.16,
+          "armor_bonus": 1
+        }
+      },
+      {
+        "id": "DIVINE",
+        "color": "yellow",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "armor": 0.19,
+          "durability": 0.18,
+          "armor_bonus": 1.3
+        }
+      },
+      {
+        "id": "FLAWLESS",
+        "color": "aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "armor": 0.2,
+          "durability": 0.2,
+          "armor_bonus": 1.5
+        }
+      }
+    ],
+    "ranged": [
+      {
+        "id": "DAMAGED",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "arrow_damage": -0.2,
+          "draw_speed": -0.18,
+          "durability": -0.2
+        }
+      },
+      {
+        "id": "CRUMBLING",
+        "color": "dark_red",
+        "tier": -1,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "arrow_damage": -0.12,
+          "draw_speed": 0.03,
+          "durability": -0.15
+        }
+      },
+      {
+        "id": "WORN",
+        "color": "gray",
+        "tier": -1,
+        "weight": 12,
+        "weight_group": "negative",
+        "effects": {
+          "arrow_damage": -0.07,
+          "draw_speed": 0.03,
+          "durability": -0.1
+        }
+      },
+      {
+        "id": "WEATHERED",
+        "color": "gray",
+        "tier": -1,
+        "weight": 10,
+        "weight_group": "negative",
+        "effects": {
+          "arrow_damage": -0.08,
+          "draw_speed": -0.06,
+          "durability": 0.04
+        }
+      },
+      {
+        "id": "STANDARD",
+        "color": "white",
+        "tier": 0,
+        "weight": 50,
+        "weight_group": "neutral",
+        "effects": {}
+      },
+      {
+        "id": "POLISHED",
+        "color": "aqua",
+        "tier": 1,
+        "weight": 15,
+        "weight_group": "positive",
+        "effects": {
+          "arrow_damage": 0.04,
+          "draw_speed": 0.06,
+          "durability": -0.04
+        }
+      },
+      {
+        "id": "REFINED",
+        "color": "blue",
+        "tier": 1,
+        "weight": 10,
+        "weight_group": "positive",
+        "effects": {
+          "arrow_damage": 0.06,
+          "draw_speed": -0.02,
+          "durability": 0.06
+        }
+      },
+      {
+        "id": "SUPERIOR",
+        "color": "green",
+        "tier": 2,
+        "weight": 6,
+        "weight_group": "high",
+        "effects": {
+          "arrow_damage": 0.09,
+          "draw_speed": 0.08,
+          "durability": 0.02
+        }
+      },
+      {
+        "id": "MASTERWORK",
+        "color": "dark_green",
+        "tier": 2,
+        "weight": 3,
+        "weight_group": "high",
+        "effects": {
+          "arrow_damage": 0.11,
+          "draw_speed": 0.09,
+          "durability": 0.11
+        }
+      },
+      {
+        "id": "EPIC",
+        "color": "light_purple",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "arrow_damage": 0.14,
+          "draw_speed": 0.11,
+          "durability": 0.13
+        }
+      },
+      {
+        "id": "LEGENDARY",
+        "color": "gold",
+        "tier": 3,
+        "weight": 1,
+        "weight_group": "high",
+        "effects": {
+          "arrow_damage": 0.15,
+          "draw_speed": 0.13,
+          "durability": 0.14
+        }
+      },
+      {
+        "id": "ANCIENT",
+        "color": "dark_aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "arrow_damage": 0.17,
+          "draw_speed": 0.17,
+          "durability": 0.16
+        }
+      },
+      {
+        "id": "FLAWLESS",
+        "color": "aqua",
+        "tier": 4,
+        "weight": 0,
+        "weight_group": "high",
+        "unlock_level": 5,
+        "effects": {
+          "arrow_damage": 0.2,
+          "draw_speed": 0.18,
+          "durability": 0.2
+        }
+      }
+    ],
+    "shield": [
+      {
+        "id": "BRITTLE",
+        "color": "dark_gray",
+        "tier": -2,
+        "weight": 3,
+        "weight_group": "negative",
+        "effects": {
+          "durability": -0.2,
+          "armor_bonus": -0.5,
+          "move_speed": -0.03,
+          "hold_mining": -0.05
+        }
+      },
+      {
+        "id": "HEAVY",
+        "color": "dark_gray",
+        "tier": -1,
+        "weight": 8,
+        "weight_group": "negative",
+        "effects": {
+          "durability": -0.15,
+          "armor_bonus": 0.55,
+          "move_speed": -0.1,
+          "hold_mining": -0.08
+        }
+      },
+      {
+        "id": "SLUGGISH",
+        "color": "gray",
+        "tier": -1,
+        "weight": 6,
+        "weight_group": "negative",
+        "effects": {
+          "durability": -0.06,
+          "armor_bonus": 0.35,
+          "move_speed": -0.12,
+          "hold_mining": -0.06
+        }
+      },
+      {
+        "id": "CUMBERSOME",
+        "color": "red",
+        "tier": -1,
+        "weight": 6,
+        "weight_group": "negative",
+        "effects": {
+          "durability": 0.05,
+          "armor_bonus": 0.25,
+          "move_speed": -0.03,
+          "hold_mining": -0.15
+        }
+      },
+      {
+        "id": "THICK",
+        "color": "blue",
+        "tier": 0,
+        "weight": 50,
+        "weight_group": "neutral",
+        "effects": {
+          "durability": 0.08,
+          "armor_bonus": 0.4,
+          "move_speed": -0.03
+        }
+      },
+      {
+        "id": "SOLID",
+        "color": "green",
+        "tier": 1,
+        "weight": 15,
+        "weight_group": "positive",
+        "effects": {
+          "durability": 0.12,
+          "armor_bonus": 0.7,
+          "hold_mining": -0.03
+        }
+      },
+      {
+        "id": "FORTIFIED",
+        "color": "dark_green",
+        "tier": 1,
+        "weight": 6,
+        "weight_group": "high",
+        "effects": {
+          "durability": 0.16,
+          "armor_bonus": 1.1,
+          "move_speed": -0.02
+        }
+      },
+      {
+        "id": "REINFORCED",
+        "color": "dark_blue",
+        "tier": 2,
+        "weight": 3,
+        "weight_group": "high",
+        "effects": {
+          "durability": 0.2,
+          "armor_bonus": 1.5,
+          "move_speed": 0.03,
+          "hold_mining": 0.03
+        }
+      }
+    ]
+  }
+}

@@ -9,14 +9,15 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
+import org.Bacontete.hardcore_region_difficulty.forge.ForgeConfig;
 
 import java.util.List;
 import java.util.stream.Stream;
 
 public class AdvancedEnchantments {
 
-    // Rarity quyết định giá XP trên đe (đồ / sách mỗi cấp): COMMON 1/1, UNCOMMON 2/1, RARE 4/2, VERY_RARE 8/4.
-    // Nâng cao = UNCOMMON, Đánh Nhanh + Xuyên Giáp = COMMON, Sát Thương Chuẩn = RARE.
+    // Rarity decides the anvil XP cost (items / books per level): COMMON 1/1, UNCOMMON 2/1, RARE 4/2, VERY_RARE 8/4.
+    // Advanced = UNCOMMON, Swift Strike + Armor Piercing = COMMON, True Damage = RARE.
     public static final DeferredRegister<Enchantment> ENCHANTMENTS =
             DeferredRegister.create(ForgeRegistries.ENCHANTMENTS, HardcoreRegionDifficulty.MODID);
 
@@ -69,32 +70,54 @@ public class AdvancedEnchantments {
                 .toList();
     }
 
-    /** Pool mặc định (thủ thư, sách ngoài loot): enchant Advanced + Đánh Nhanh, KHÔNG có Sát Thương Chuẩn (loot riêng). */
+    /** Default pool (librarians, books outside loot): Advanced enchants + Swift Strike, NO True Damage (it has its own loot). */
     public static List<Enchantment> lootPool() {
         return present(ADVANCED_PROTECTION, ADVANCED_THORNS, ADVANCED_FEATHER_FALLING,
                 ADVANCED_SHARPNESS, ADVANCED_FIRE_ASPECT, ADVANCED_KNOCKBACK, ADVANCED_LOOTING,
                 ADVANCED_POWER, ADVANCED_EFFICIENCY, ADVANCED_UNBREAKING, SWIFT_STRIKE);
     }
 
-    /** Enchant nâng cao (VERY_RARE) loot trên đồ trong rương và sách dungeon. */
+    /** Advanced enchants (VERY_RARE) looted on chest items and dungeon books. */
     public static List<Enchantment> advancedPool() {
         return present(ADVANCED_PROTECTION, ADVANCED_THORNS, ADVANCED_FEATHER_FALLING,
                 ADVANCED_SHARPNESS, ADVANCED_FIRE_ASPECT, ADVANCED_KNOCKBACK, ADVANCED_LOOTING,
                 ADVANCED_POWER, ADVANCED_EFFICIENCY, ADVANCED_UNBREAKING);
     }
 
-    /** Enchant "thường" (UNCOMMON) loot trên đồ trong rương. */
+    /** "Normal" enchants (UNCOMMON) looted on chest items. */
     public static List<Enchantment> normalPool() {
         return present(SWIFT_STRIKE);
     }
 
     @SafeVarargs
     private static List<Enchantment> present(RegistryObject<Enchantment>... objs) {
-        return Stream.of(objs).filter(RegistryObject::isPresent).map(RegistryObject::get).toList();
+        return Stream.of(objs).filter(o -> o.isPresent() && isEnabled(o.get())).map(RegistryObject::get).toList();
+    }
+
+    /** False when the enchantment (or all of this mod's enchantments) is switched off in the common config. */
+    public static boolean isEnabled(Enchantment enchantment) {
+        var key = ForgeRegistries.ENCHANTMENTS.getKey(enchantment);
+        return key != null && key.getNamespace().equals(HardcoreRegionDifficulty.MODID) && isEnabled(key.getPath());
+    }
+
+    public static boolean isEnabled(String id) {
+        try {
+            if (!ForgeConfig.ENCHANTMENTS_ENABLED.get()) {
+                return false;
+            }
+            var toggle = ForgeConfig.ENCHANT_TOGGLES.get(id);
+            return toggle == null || toggle.get();
+        } catch (IllegalStateException configNotLoadedYet) {
+            return true;
+        }
+    }
+
+    public static boolean isEnabled(RegistryObject<Enchantment> enchantment) {
+        return enchantment.isPresent() && isEnabled(enchantment.get());
     }
 
     public static int levelOf(ItemStack stack, RegistryObject<Enchantment> enchantment) {
-        if (stack.isEmpty() || !enchantment.isPresent()) {
+        if (stack.isEmpty() || !enchantment.isPresent() || !isEnabled(enchantment.get())) {
             return 0;
         }
         return EnchantmentHelper.getItemEnchantmentLevel(enchantment.get(), stack);

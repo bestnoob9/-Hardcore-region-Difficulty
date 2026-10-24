@@ -15,6 +15,7 @@ public final class ClientConfigHooks {
     private ClientConfigHooks() {}
 
     public static void register() {
+        IconFolder.init();
         if (!ModList.get().isLoaded("cloth_config")) {
             return;
         }

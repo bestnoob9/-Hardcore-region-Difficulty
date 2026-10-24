@@ -26,6 +26,9 @@ public class AdvancedSharpnessEnchantment extends AdvancedEnchantmentBase {
 
     @Override
     public float getDamageBonus(int level, MobType mobType) {
+        if (!isActive()) {
+            return 0.0F;
+        }
         return level * 2.5f;
     }
 

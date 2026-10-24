@@ -3,8 +3,10 @@ package org.Bacontete.hardcore_region_difficulty.common.client;
 import net.minecraft.client.Minecraft;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.TitleDisplaySettings;
+import org.Bacontete.hardcore_region_difficulty.common.entity.BossLevel;
 import org.Bacontete.hardcore_region_difficulty.forge.ClientConfig;
 
 import java.util.HashMap;
@@ -12,14 +14,23 @@ import java.util.Map;
 
 public class TitleDisplayHandler {
 
-    public record Active(String name, String subtitle, int skullTier, long startMillis,
+    /**
+     * @param icon  icon of the region ("" = default skull of the tier)
+     * @param color subtitle color 0xRRGGBB, -1 = default
+     */
+    public record Active(String name, String subtitle, String skullIcon, long startMillis,
                          int fadeInTicks, int stayTicks, int fadeOutTicks,
-                         double scale, int yOffset) {}
+                         double scale, int yOffset, String icon, int color) {}
 
-    public static final int SKULL_TIERS = 7;
+    /** Regions have skull_1 ... skull_5; bosses have their own skulls (see {@link BossLevel#skullIcon()}). */
+    public static final int MAX_SKULL_LEVEL = 5;
 
     public static int skullTier(int difficultyLevel) {
-        return Math.max(1, Math.min(SKULL_TIERS, difficultyLevel));
+        return Math.max(1, Math.min(MAX_SKULL_LEVEL, difficultyLevel));
+    }
+
+    private static String skullIcon(int tier) {
+        return "skull_" + tier;
     }
 
     private static ChatFormatting skullColor(int tier) {
@@ -28,17 +39,18 @@ public class TitleDisplayHandler {
             case 2 -> ChatFormatting.YELLOW;
             case 3 -> ChatFormatting.GOLD;
             case 4 -> ChatFormatting.RED;
-            case 5 -> ChatFormatting.LIGHT_PURPLE;
-            case 6 -> ChatFormatting.DARK_PURPLE;
-            default -> ChatFormatting.DARK_RED;
+            default -> ChatFormatting.LIGHT_PURPLE;
         };
     }
 
     private static volatile Active current;
     private static final Map<String, Long> LAST_SHOWN = new HashMap<>();
 
-    /** Cong trinh cua packet title truoc do (ke ca packet bi cooldown chan), de biet khi nao vua ra khoi cong trinh. */
+    /** Structure of the previous title packet (including packets blocked by the cooldown), used to tell when the player has just left a structure. */
     private static String lastPacketStructure = "";
+
+    /** Level of the previous title packet; a level change is always shown and is never blocked by the cooldown. */
+    private static int lastPacketLevel = Integer.MIN_VALUE;
 
     public static Active current() {
         return current;
@@ -48,7 +60,7 @@ public class TitleDisplayHandler {
         current = null;
     }
 
-    public static void displayBossTitle(String entityName, String bossTypeKey, int bossLevel) {
+    public static void displayBossTitle(String entityName, BossLevel bossLevel, String icon, int titleColor) {
         DifficultyConfig config = DifficultyConfig.getInstance();
         if (config != null && config.hasFileChanged()) {
             config.loadConfig();
@@ -65,25 +77,32 @@ public class TitleDisplayHandler {
 
         long now = System.currentTimeMillis();
 
-        int tier = skullTier(bossLevel);
-
         if (settings.isVanillaStyle()) {
             minecraft.gui.setTimes(settings.getFadeInTicks(), settings.getStayTicks(), settings.getFadeOutTicks());
-            minecraft.gui.setSubtitle(Component.literal("\u2620 ").withStyle(skullColor(tier))
-                    .append(Component.translatable(bossTypeKey).withStyle(ChatFormatting.GRAY)));
+            Component skull = Component.literal("\u2620 ");
+            skull = titleColor >= 0 ? skull.copy().withStyle(Style.EMPTY.withColor(titleColor)) : skull.copy().withStyle(bossLevel.skullColor());
+            minecraft.gui.setSubtitle(skull.copy()
+                    .append(Component.translatable(bossLevel.titleKey()).withStyle(ChatFormatting.GRAY)));
             minecraft.gui.setTitle(Component.literal(entityName));
             return;
         }
 
-        current = new Active(entityName, Component.translatable(bossTypeKey).getString(), tier, now,
+        current = new Active(entityName, Component.translatable(bossLevel.titleKey()).getString(), bossLevel.skullIcon(), now,
                 settings.getFadeInTicks(), settings.getStayTicks(), settings.getFadeOutTicks(),
-                settings.getScale(), settings.getYOffset());
+                settings.getScale(), settings.getYOffset(), icon == null ? "" : icon, titleColor);
     }
 
     public static void displayTitle(String regionName, String difficultyTitle, String structureName, int difficultyLevel) {
+        displayTitle(regionName, difficultyTitle, structureName, difficultyLevel, "", -1);
+    }
+
+    public static void displayTitle(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
+                                    String icon, int titleColor) {
         String incomingStructure = structureName == null ? "" : structureName;
         boolean leftStructure = !lastPacketStructure.isEmpty() && incomingStructure.isEmpty();
         lastPacketStructure = incomingStructure;
+        boolean levelChanged = difficultyLevel != lastPacketLevel;
+        lastPacketLevel = difficultyLevel;
 
         DifficultyConfig config = DifficultyConfig.getInstance();
         if (config != null && config.hasFileChanged()) {
@@ -100,10 +119,13 @@ public class TitleDisplayHandler {
         }
 
         long now = System.currentTimeMillis();
-        String key = regionName + "|" + structureName;
+        // a structure title always shows (the server already sends it only when the player enters one);
+        // biome titles keep the cooldown, but a different level (vs the previous title) always shows
+        String key = regionName + "|" + structureName + "|" + difficultyLevel;
         int cooldown = settings.getRepeatCooldownSeconds();
         Long last = LAST_SHOWN.get(key);
-        if (!leftStructure && cooldown > 0 && last != null && now - last < cooldown * 1000L) {
+        if (!leftStructure && !levelChanged && incomingStructure.isEmpty() && cooldown > 0 && last != null
+                && now - last < cooldown * 1000L) {
             return;
         }
         if (LAST_SHOWN.size() > 64) {
@@ -117,14 +139,16 @@ public class TitleDisplayHandler {
         if (settings.isVanillaStyle()) {
             minecraft.gui.setTimes(settings.getFadeInTicks(), settings.getStayTicks(), settings.getFadeOutTicks());
 
-            minecraft.gui.setSubtitle(Component.literal("\u2620 ").withStyle(skullColor(tier))
+            Component skull = Component.literal("\u2620 ");
+            skull = titleColor >= 0 ? skull.copy().withStyle(Style.EMPTY.withColor(titleColor)) : skull.copy().withStyle(skullColor(tier));
+            minecraft.gui.setSubtitle(skull.copy()
                     .append(Component.literal(subtitleText).withStyle(ChatFormatting.GRAY)));
             minecraft.gui.setTitle(Component.literal(regionName));
             return;
         }
 
-        current = new Active(regionName, subtitleText, tier, now,
+        current = new Active(regionName, subtitleText, skullIcon(tier), now,
                 settings.getFadeInTicks(), settings.getStayTicks(), settings.getFadeOutTicks(),
-                settings.getScale(), settings.getYOffset());
+                settings.getScale(), settings.getYOffset(), icon == null ? "" : icon, titleColor);
     }
 }

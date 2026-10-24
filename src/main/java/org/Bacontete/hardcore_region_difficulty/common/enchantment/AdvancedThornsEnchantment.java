@@ -20,6 +20,9 @@ public class AdvancedThornsEnchantment extends AdvancedEnchantmentBase {
 
     @Override
     public void doPostHurt(LivingEntity user, Entity attacker, int level) {
+        if (!isActive()) {
+            return;
+        }
         if (attacker == null || user.level().isClientSide) {
             return;
         }

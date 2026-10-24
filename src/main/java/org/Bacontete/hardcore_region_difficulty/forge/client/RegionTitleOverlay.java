@@ -13,20 +13,13 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
 import org.Bacontete.hardcore_region_difficulty.common.client.TitleDisplayHandler;
+import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyIcons;
 
 @Mod.EventBusSubscriber(modid = HardcoreRegionDifficulty.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class RegionTitleOverlay {
     private RegionTitleOverlay() {}
 
-    private static final ResourceLocation[] SKULLS = new ResourceLocation[TitleDisplayHandler.SKULL_TIERS];
-    static {
-        for (int i = 0; i < SKULLS.length; i++) {
-            SKULLS[i] = ResourceLocation.fromNamespaceAndPath(HardcoreRegionDifficulty.MODID, "textures/gui/skull_" + (i + 1) + ".png");
-        }
-    }
-    private static final int SKULL_TEXTURE_SIZE = 12;
-
-    private static final int SKULL_SIZE = 11;
+    private static final int SKULL_SIZE = 16;
     private static final int SKULL_GAP = 3;
 
     @SubscribeEvent
@@ -88,10 +81,15 @@ public final class RegionTitleOverlay {
         int totalWidth = SKULL_SIZE + SKULL_GAP + textWidth;
         int left = -totalWidth / 2;
         RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-        graphics.blit(SKULLS[active.skullTier() - 1], left, -1, SKULL_SIZE, SKULL_SIZE,
-                0f, 0f, SKULL_TEXTURE_SIZE, SKULL_TEXTURE_SIZE, SKULL_TEXTURE_SIZE, SKULL_TEXTURE_SIZE);
+        ResourceLocation custom = DifficultyIcons.texture(active.icon());
+        ResourceLocation iconTexture = custom != null && IconFolder.ensure(custom)
+                ? custom : DifficultyIcons.texture(active.skullIcon());
+        // UV size 1/1 of a 1x1 "texture" = the whole image, so any square size works (12x12 built-in, 32x32, 64x64 ...)
+        graphics.blit(iconTexture, left, -3, SKULL_SIZE, SKULL_SIZE,
+                0f, 0f, 1, 1, 1, 1);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        graphics.drawString(font, active.subtitle(), left + SKULL_SIZE + SKULL_GAP, 1, (a << 24) | 0xBBBBBB, true);
+        graphics.drawString(font, active.subtitle(), left + SKULL_SIZE + SKULL_GAP, 1,
+                (a << 24) | (active.color() >= 0 ? active.color() : 0xBBBBBB), true);
         pose.popPose();
 
         RenderSystem.disableBlend();

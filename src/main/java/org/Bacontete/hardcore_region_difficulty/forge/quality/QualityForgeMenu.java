@@ -15,7 +15,6 @@ import org.Bacontete.hardcore_region_difficulty.common.quality.ForgeMaterials;
 import org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityConfig;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityType;
-import org.Bacontete.hardcore_region_difficulty.common.quality.QualityTypeTool;
 
 public class QualityForgeMenu extends AbstractContainerMenu {
 
@@ -39,7 +38,7 @@ public class QualityForgeMenu extends AbstractContainerMenu {
     private final DataSlot costData = DataSlot.standalone();
     private final DataSlot xpCostData = DataSlot.standalone();
 
-    private QualityType pendingQuality = QualityTypeTool.STANDARD;
+    private QualityType pendingQuality = null;
 
     public QualityForgeMenu(int id, Inventory inventory, ContainerLevelAccess access) {
         super(QualityForgeRegistry.QUALITY_FORGE_MENU.get(), id);
@@ -128,10 +127,16 @@ public class QualityForgeMenu extends AbstractContainerMenu {
         ItemStack item = input.getItem(ITEM_SLOT);
         ItemStack material = input.getItem(MATERIAL_SLOT);
         result.setItem(0, ItemStack.EMPTY);
+        pendingQuality = null;
         if (!item.isEmpty() && !material.isEmpty()
                 && material.getCount() >= costData.get()
                 && ForgeMaterials.accepts(item, material, player.level())) {
-            pendingQuality = ItemQuality.roll(RandomSource.create(rollSeed(item)), 1, item);
+            pendingQuality = ItemQuality.rollForge(RandomSource.create(rollSeed(item)), item, player.getLuck());
+            if (pendingQuality == null) {
+                // the category has no quality defined: nothing to forge
+                broadcastChanges();
+                return;
+            }
             ItemStack forged = item.copy();
 
             if (forged.getTag() != null) {

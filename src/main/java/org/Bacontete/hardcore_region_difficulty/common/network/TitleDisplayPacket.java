@@ -9,7 +9,18 @@ public class TitleDisplayPacket {
 
     private final int difficultyLevel;
 
+    /** Icon of the region ("" = default skull of the level) and title color (0xRRGGBB, -1 = default). */
+    private final String icon;
+    private final int titleColor;
+
     public TitleDisplayPacket(String regionName, String difficultyTitle, String structureName, int difficultyLevel) {
+        this(regionName, difficultyTitle, structureName, difficultyLevel, "", -1);
+    }
+
+    public TitleDisplayPacket(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
+                              String icon, int titleColor) {
+        this.icon = icon == null ? "" : icon;
+        this.titleColor = titleColor;
         this.difficultyLevel = difficultyLevel;
         this.regionName = regionName == null ? "" : regionName;
         this.difficultyTitle = difficultyTitle == null ? "" : difficultyTitle;
@@ -21,6 +32,8 @@ public class TitleDisplayPacket {
         this.difficultyTitle = buffer.readUtf();
         this.structureName = buffer.readUtf();
         this.difficultyLevel = buffer.readVarInt();
+        this.icon = buffer.readUtf();
+        this.titleColor = buffer.readInt();
     }
 
     public void encode(FriendlyByteBuf buffer) {
@@ -28,6 +41,8 @@ public class TitleDisplayPacket {
         buffer.writeUtf(difficultyTitle);
         buffer.writeUtf(structureName);
         buffer.writeVarInt(difficultyLevel);
+        buffer.writeUtf(icon);
+        buffer.writeInt(titleColor);
     }
 
     public String getRegionName() {
@@ -44,5 +59,13 @@ public class TitleDisplayPacket {
 
     public int getDifficultyLevel() {
         return difficultyLevel;
+    }
+
+    public String getIcon() {
+        return icon;
+    }
+
+    public int getTitleColor() {
+        return titleColor;
     }
 }

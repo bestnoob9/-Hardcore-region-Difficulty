@@ -1,4 +1,6 @@
 {
+  "difficulty_levels": [],
+  "_difficulty_levels_example": {"level": 6, "title": "Difficulty VI", "icon": "flame", "title_color": "#FF5500", "health_bonus_percent": 300, "damage_bonus_percent": 150, "armor_bonus_percent": 100, "speed_bonus_percent": 10, "armor_flat_bonus": 6, "quality_bonus_percent": 80, "high_quality_bonus_percent": 200},
   "difficulty_regions": [
     {
       "id": "overworld_default",
@@ -133,14 +135,50 @@
     }
   ],
   "scaling_settings": {
+    "scaling_mode": "compound",
     "health_percent_per_level": 25.0,
     "damage_percent_per_level": 20.0,
     "armor_percent_per_level": 20.0,
     "speed_percent_per_level": 2.0,
     "armor_flat_per_level": 1.0,
+    "scaling_soft_cap_level": 5,
+    "diminishing_factor": 0.75,
+    "boss_health_multiplier": 1.25,
+    "boss_damage_multiplier": 1.15,
+    "boss_armor_multiplier": 1.1,
+    "mini_boss_health_multiplier": 1.1,
+    "mini_boss_damage_multiplier": 1.1,
+    "mini_boss_armor_multiplier": 1.05,
+    "elite_enabled": true,
+    "elite_min_level": 4,
+    "elite_base_chance": 0.15,
+    "elite_chance_per_level": 0.08,
+    "elite_max_affixes": 2,
+    "elite_max_per_level": 1,
+    "elite_particles": true,
+    "elite_show_affix_names": true,
     "exclude_entities": [],
+    "whitelist_entities": [],
     "boss_health_threshold": 150,
-    "raid_difficulty_level": 3
+    "raid_difficulty_level": 3,
+    "level_cap_enabled": true,
+    "dimension_level_bonus": 2,
+    "max_region_level": 0,
+    "dimension_level_caps": {},
+    "loot": {
+      "enabled": true,
+      "chests": true,
+      "mobs": true,
+      "min_level": 2,
+      "chest_extra_roll_chance_percent_per_level": 10,
+      "chest_max_extra_rolls": 3,
+      "chest_count_percent_per_level": 10,
+      "chest_enchant_chance_percent_per_level": 4,
+      "mob_extra_drop_chance_percent_per_level": 6,
+      "mob_max_extra_drops": 2,
+      "mob_count_percent_per_level": 6,
+      "mob_enchant_chance_percent_per_level": 2
+    }
   },
   "enchantment_settings": {
     "base_chance_per_level": {
@@ -192,6 +230,7 @@
     "unknown_structure_level": 0,
     "structure_spawn_level": 3,
     "analyze_spawners": true,
+    "auto_extend_thresholds": true,
     "spawner_scan_radius": 48,
     "spawner_level_thresholds": {
       "2": 1,

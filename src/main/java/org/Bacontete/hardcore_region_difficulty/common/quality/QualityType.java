@@ -1,17 +1,21 @@
 package org.Bacontete.hardcore_region_difficulty.common.quality;
 
-import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 
 /**
- * Balance limits for every quality type (all categories):
- * <ul>
- *   <li>Percent values (damage, speed, durability, mining, move speed, hold mining): -0.20 .. +0.20 (-20% .. +20%)</li>
- *   <li>Flat values (reach, armor bonus): -0.5 .. +1.5</li>
- * </ul>
+ * One quality of one item category. Implemented by {@link QualityDefinition}, which is loaded from
+ * config/hardcore_region_difficulty-qualities.json (see {@link QualityRegistry}).
  */
 public interface QualityType {
     int getTier();
-    ChatFormatting getColor();
+    /** Color of the quality name (vanilla color or any #RRGGBB). */
+    TextColor getTextColor();
+    /** Style that only carries the color. */
+    Style getStyle();
+    /** Colored, translated display name. */
+    Component getDisplayName();
     double getDamagePercent();
     double getSpeedPercent();
     double getDurabilityPercent();
@@ -23,5 +27,6 @@ public interface QualityType {
     boolean isShieldQuality();
     boolean isNegative();
     boolean isPositive();
+    /** Stable id, stored in the item tag. */
     String name();
 }

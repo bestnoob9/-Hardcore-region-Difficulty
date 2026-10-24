@@ -44,7 +44,10 @@ public class AdvancedEnchantLootModifier extends LootModifier {
 
         int difficultyLevel = LocationMatcher.getDifficultyLevel(level, pos);
 
-        // Loot Advanced (enchant nâng cao + sách): chỉ từ vùng cấp 3 trở lên (advanced_min_level), tỉ lệ đã nhân hệ số "khó hơn"
+        // more loot in higher regions (extra rolls, bigger stacks, enchants), before the steps below
+        org.Bacontete.hardcore_region_difficulty.common.loot.RegionLootBonus.applyToChest(generatedLoot, context, table, difficultyLevel);
+
+        // Advanced loot (advanced enchants + books): only from region level 3 up (advanced_min_level), chance already multiplied by the "harder" factor
         if (LootTableInjector.advancedAllowed(difficultyLevel)) {
             for (int i = 0; i < generatedLoot.size(); i++) {
                 generatedLoot.set(i, LootTableInjector.tryEnchantItem(generatedLoot.get(i), difficultyLevel, context.getRandom()));
@@ -60,7 +63,7 @@ public class AdvancedEnchantLootModifier extends LootModifier {
                 && org.Bacontete.hardcore_region_difficulty.common.quality.QualityConfig.ROLL_IN_LOOT.get()) {
             for (ItemStack stack : generatedLoot) {
                 if (org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.isEligible(stack) && !org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.has(stack)) {
-                    org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.set(stack, org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.roll(context.getRandom(), difficultyLevel, stack));
+                    org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.set(stack, org.Bacontete.hardcore_region_difficulty.common.quality.ItemQuality.roll(context.getRandom(), difficultyLevel, stack, context.getLuck()));
                 }
             }
         }

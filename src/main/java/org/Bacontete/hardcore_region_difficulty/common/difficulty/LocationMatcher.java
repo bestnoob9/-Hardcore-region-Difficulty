@@ -25,8 +25,6 @@ public class LocationMatcher {
         }
     }
 
-    public static final int MAX_REGION_LEVEL = 5;
-
     private static final int TIER_DIMENSION = 1;
     private static final int TIER_BIOME_TAG = 2;
     private static final int TIER_BIOME = 3;
@@ -42,7 +40,8 @@ public class LocationMatcher {
             return raw;
         }
 
-        int max = Math.min(MAX_REGION_LEVEL, DimensionDangerEvaluator.getMaxDifficulty(dimensionBaseLevel(level, config)));
+        int max = DimensionDangerEvaluator.getMaxDifficulty(level.dimension().location(),
+                dimensionBaseLevel(level, config), config.getScalingSettings());
         DifficultyRegion region = raw.region();
         if (region.getDifficultyLevel() <= max) {
             return raw;
@@ -50,7 +49,9 @@ public class LocationMatcher {
 
         DifficultyRegion capped = new DifficultyRegion(region.getId(), region.getRegionName(),
                 "Difficulty " + DangerAnalyzer.roman(max), max,
-                region.getDimensions(), region.getBiomes(), region.getBiomeTags(), region.getStructures());
+                region.getDimensions(), region.getBiomes(), region.getBiomeTags(), region.getStructures(),
+                config.levelIcon(max), config.levelColor(max), region.getMobEntries())
+                .withLootOverride(region.getLootOverride());
         return new Match(capped, raw.structureName(), raw.dimensionWide());
     }
 
@@ -154,8 +155,26 @@ public class LocationMatcher {
             DangerAnalyzer.DangerResult danger = DangerAnalyzer.analyze(hits, biome, spawners, dimension,
                     spawners > 0 ? () -> DangerAnalyzer.structureHitsAtNearestSpawner(level, pos) : null, enemies);
             if (danger.isDangerous && danger.difficultyLevel > 0) {
+                if (danger != dimension && config.getScalingSettings().isDangerScaleEnabled()
+                        && !DangerAnalyzer.hasOverrideLevel(hits, danger.difficultyLevel)) {
+                    // ratings made for levels 1-5 follow the level of the dimension (see ScalingSettings#adjustForDimension)
+                    danger = DangerAnalyzer.withLevel(danger, config.getScalingSettings()
+                            .adjustForDimension(danger.difficultyLevel, dimensionBaseLevel(level, config)));
+                }
 
                 if (dimensionBest != null && dimensionLevel >= danger.difficultyLevel) {
+                    if (danger != dimension && danger.structureName != null && !danger.structureName.isEmpty()) {
+                        // a structure inside a dimension of the same or a higher level: the level stays the one of
+                        // the dimension, but the player is still in a structure (its title must show)
+                        DifficultyRegion d = dimensionBest.region();
+                        DifficultyRegion named = new DifficultyRegion(
+                                "smart_auto_" + danger.regionName.toLowerCase().replace(' ', '_'),
+                                danger.regionName, d.getDifficultyTitle(), d.getDifficultyLevel(),
+                                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                                Collections.emptyList(), d.getIcon(), d.getTitleColor(), d.getMobEntries())
+                                .withLootOverride(d.getLootOverride());
+                        return new Match(named, danger.structureName, false);
+                    }
                     return dimensionBest;
                 }
 
@@ -203,12 +222,16 @@ public class LocationMatcher {
     }
 
     private static DifficultyRegion createSyntheticRegion(DangerAnalyzer.DangerResult result) {
+        DifficultyConfig cfg = DifficultyConfig.getInstance();
+        String icon = cfg == null ? "" : cfg.levelIcon(result.difficultyLevel);
+        String color = cfg == null ? "" : cfg.levelColor(result.difficultyLevel);
         return new DifficultyRegion(
                 "smart_auto_" + result.regionName.toLowerCase().replace(' ', '_'),
                 result.regionName,
                 result.difficultyTitle,
                 result.difficultyLevel,
-                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+                icon, color);
     }
 
     public static int getDifficultyLevel(Level level, BlockPos pos) {

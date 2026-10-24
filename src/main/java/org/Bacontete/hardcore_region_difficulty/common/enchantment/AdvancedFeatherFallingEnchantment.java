@@ -20,6 +20,9 @@ public class AdvancedFeatherFallingEnchantment extends AdvancedEnchantmentBase {
 
     @Override
     public int getDamageProtection(int level, DamageSource source) {
+        if (!isActive()) {
+            return 0;
+        }
         if (source.is(DamageTypeTags.BYPASSES_INVULNERABILITY)) {
             return 0;
         }

@@ -45,6 +45,15 @@ public final class PatternMatcher {
         return !anyPositive || positiveHit;
     }
 
+    /** Does this single pattern (not a "!" one) match the id? Used to find the details of one mob. */
+    public static boolean matchesSingle(String pattern, ResourceLocation id, Predicate<ResourceLocation> tagTest) {
+        if (pattern == null || id == null) {
+            return false;
+        }
+        String p = pattern.trim();
+        return !p.isEmpty() && !p.startsWith("!") && single(p, id, tagTest);
+    }
+
     private static boolean single(String p, ResourceLocation id, Predicate<ResourceLocation> tagTest) {
         if (p.equals("*")) return true;
         if (p.startsWith("#")) {

@@ -42,17 +42,18 @@ public class BossDetector {
         return baseHealth >= BOSS_HEALTH_THRESHOLD;
     }
 
-    public static int getBossDifficultyLevel(Mob mob) {
-        if (mob == null || EntityScaler.isExcluded(mob)) return 0;   
+    /** Boss class of the mob, or null if the mob is not a boss (or is excluded). */
+    public static BossLevel getBossLevel(Mob mob) {
+        if (mob == null || EntityScaler.isExcluded(mob)) return null;   
 
-        if (mob.getType().is(MINI_BOSS_TAG)) return 6;
-        if (mob.getType().is(BOSS_TAG)) return 7;
+        if (mob.getType().is(MINI_BOSS_TAG)) return BossLevel.MINI_BOSS;
+        if (mob.getType().is(BOSS_TAG)) return BossLevel.BOSS;
 
-        if (isBoss(mob)) return 7;
-        if (isMiniBoss(mob)) return 6;
+        if (isBoss(mob)) return BossLevel.BOSS;
+        if (isMiniBoss(mob)) return BossLevel.MINI_BOSS;
 
-        if (mob.getType().is(FORGE_BOSSES_TAG)) return 6;
-        return 0;
+        if (mob.getType().is(FORGE_BOSSES_TAG)) return BossLevel.MINI_BOSS;
+        return null;
     }
 
     public static boolean hasBossTag(Mob mob) {

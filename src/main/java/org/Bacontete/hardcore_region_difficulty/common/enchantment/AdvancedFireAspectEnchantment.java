@@ -20,6 +20,9 @@ public class AdvancedFireAspectEnchantment extends AdvancedEnchantmentBase {
 
     @Override
     public void doPostAttack(LivingEntity attacker, Entity target, int level) {
+        if (!isActive()) {
+            return;
+        }
         if (!attacker.level().isClientSide && !target.fireImmune()) {
             target.setSecondsOnFire(level * 6);
         }

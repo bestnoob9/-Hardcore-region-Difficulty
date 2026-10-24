@@ -25,12 +25,21 @@ public class PlayerRegionTracker {
 
         public final String biomeId;
 
+        /** Icon of the region ("" = default skull) and its title color ("" = default). */
+        public final String icon;
+        public final String titleColor;
+
         public RegionInfo(int difficultyLevel, String regionName, String difficultyTitle, String structureName) {
             this(difficultyLevel, regionName, difficultyTitle, structureName, "", false, "");
         }
 
         public RegionInfo(int difficultyLevel, String regionName, String difficultyTitle, String structureName,
                           String dimension, boolean dimensionWide, String biomeId) {
+            this(difficultyLevel, regionName, difficultyTitle, structureName, dimension, dimensionWide, biomeId, "", "");
+        }
+
+        public RegionInfo(int difficultyLevel, String regionName, String difficultyTitle, String structureName,
+                          String dimension, boolean dimensionWide, String biomeId, String icon, String titleColor) {
             this.difficultyLevel = difficultyLevel;
             this.regionName = regionName == null ? "" : regionName;
             this.difficultyTitle = difficultyTitle == null ? "" : difficultyTitle;
@@ -38,6 +47,8 @@ public class PlayerRegionTracker {
             this.dimension = dimension == null ? "" : dimension;
             this.dimensionWide = dimensionWide;
             this.biomeId = biomeId == null ? "" : biomeId;
+            this.icon = icon == null ? "" : icon;
+            this.titleColor = titleColor == null ? "" : titleColor;
         }
 
         @Override
@@ -82,10 +93,12 @@ public class PlayerRegionTracker {
                     ? match.region().getRegionName()
                     : DangerAnalyzer.prettify(biomeId.substring(biomeId.indexOf(':') + 1));
             newInfo = new RegionInfo(match.region().getDifficultyLevel(), name,
-                    match.region().getDifficultyTitle(), "", dimension, true, biomeId);
+                    match.region().getDifficultyTitle(), "", dimension, true, biomeId,
+                    match.region().getIcon(), match.region().getTitleColor());
         } else {
             newInfo = new RegionInfo(match.region().getDifficultyLevel(), match.region().getRegionName(),
-                    match.region().getDifficultyTitle(), match.structureName(), dimension, false, "");
+                    match.region().getDifficultyTitle(), match.structureName(), dimension, false, "",
+                    match.region().getIcon(), match.region().getTitleColor());
         }
 
         playerRegions.put(player.getUUID(), newInfo);
@@ -98,12 +111,12 @@ public class PlayerRegionTracker {
     }
 
     /**
-     * Quy tac hien title:
-     * - Lan dau (chua co vung cu): hien.
-     * - Vao mot cong trinh (tu biome/vung khac hoac tu cong trinh khac): luon hien, bat ke cap.
-     * - Dang o trong cung mot cong trinh: khong hien lai.
-     * - Biome -> biome (khong co cong trinh): chi hien khi cap/do kho khac nhau.
-     * - Ra khoi cong trinh ve biome: luon hien, bat ke cap (thap hay cao, cung cap hay khac cap).
+     * Title rules (biome = no structure at the player's feet, structure = inside a structure):
+     * - First region (no old one): shown.
+     * - biome -> biome: only when the level differs (the same level is not shown, whatever the title says).
+     * - biome -> structure, structure -> biome, structure -> another structure: always shown, any level.
+     * - Staying inside the same structure: shown again only if its level changed.
+     * - Any other change of level: shown.
      */
     static boolean shouldAnnounce(RegionInfo oldInfo, RegionInfo newInfo) {
         if (oldInfo == null) {
@@ -111,18 +124,14 @@ public class PlayerRegionTracker {
         }
         boolean newInStructure = !newInfo.structureName.isEmpty();
         boolean oldInStructure = !oldInfo.structureName.isEmpty();
-        if (newInStructure) {
-            if (!oldInStructure) {
-                return true;
-            }
-            return !(oldInfo.structureName.equals(newInfo.structureName)
-                    && oldInfo.regionName.equals(newInfo.regionName));
+        if (newInStructure || oldInStructure) {
+            boolean sameStructure = newInStructure && oldInStructure
+                    && oldInfo.structureName.equals(newInfo.structureName)
+                    && oldInfo.regionName.equals(newInfo.regionName);
+            return !sameStructure || oldInfo.difficultyLevel != newInfo.difficultyLevel;
         }
-        if (oldInStructure) {
-            return true;
-        }
-        return oldInfo.difficultyLevel != newInfo.difficultyLevel
-                || !oldInfo.difficultyTitle.equals(newInfo.difficultyTitle);
+        // biome -> biome: the title text differs by kind ("Adventure III" / "Dimension III"), so only the level counts
+        return oldInfo.difficultyLevel != newInfo.difficultyLevel;
     }
 
     public static RegionInfo getPlayerRegion(Player player) {

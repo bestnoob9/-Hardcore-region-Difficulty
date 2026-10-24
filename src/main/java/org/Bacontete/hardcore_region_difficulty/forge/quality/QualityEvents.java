@@ -82,8 +82,8 @@ public class QualityEvents {
         }
         if (!ItemQuality.has(stack)) {
             if (QualityConfig.ROLL_IN_INVENTORY.get()) {
-                int difficultyLevel = LocationMatcher.getDifficultyLevel(player.level(), player.blockPosition());
-                ItemQuality.set(stack, ItemQuality.roll(player.getRandom(), difficultyLevel, stack));
+                // crafted / inventory items: same tier-based chances as the Quality Forge (no weights, no region level)
+                ItemQuality.set(stack, ItemQuality.rollForge(player.getRandom(), stack, player.getLuck()));
             }
             return;
         }
@@ -129,17 +129,17 @@ public class QualityEvents {
             return;
         }
         ItemStack stack = event.getItemStack();
-        if (!ItemQuality.has(stack)) {
+        QualityType quality = ItemQuality.find(stack);
+        if (quality == null) {
             return;
         }
-        QualityType quality = ItemQuality.get(stack);
 
         if (ItemQuality.isArmor(stack)) {
             ArmorItem armorItem = (ArmorItem) stack.getItem();
             EquipmentSlot armorSlot = armorItem.getEquipmentSlot();
             if (event.getSlotType() == armorSlot) {
-                // % chỉ tính trên giáp/chống chịu CỦA RIÊNG món này. Không dùng MULTIPLY_BASE vì nó nhân
-                // lên tổng giáp của cả bộ (mọi món đang mặc), nên đổi % thành số cộng thẳng theo chỉ số gốc của món.
+                // the % only counts the armor / toughness OF THIS PIECE alone. MULTIPLY_BASE is not used because it multiplies
+                // the total armor of the whole set (every worn piece), so the % becomes a flat amount based on the base stat of the piece.
                 double armorPercent = quality.getDamagePercent();
                 if (armorPercent != 0) {
                     double armorDelta = armorItem.getDefense() * armorPercent;

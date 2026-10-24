@@ -31,13 +31,13 @@ public class EnchantmentSettings {
 
     private boolean dungeonBookAuto = true;
 
-    /** Loot Advanced (enchant nâng cao trên đồ trong rương + sách) chỉ ra ở vùng có cấp từ mức này trở lên. */
+    /** Advanced loot (advanced enchants on chest items + books) only drops in regions of this level or higher. */
     private int advancedMinLevel = 3;
 
-    /** Nhân vào mọi tỉ lệ ra loot Advanced (đồ enchant, sách dungeon, sách công trình, sách Armor Piercing). */
+    /** Multiplies every Advanced loot chance (enchanted items, dungeon books, structure books, Armor Piercing books). */
     private double advancedChanceMultiplier = 0.7;
 
-    /** Tỉ lệ giữa hai cấp enchant liền nhau của loot Advanced (đồ + sách dungeon): nhỏ hơn = cấp cao khó ra hơn. */
+    /** Ratio between two consecutive enchant levels of Advanced loot (items + dungeon books): smaller = higher levels are rarer. */
     private double advancedLootLevelDecay = 0.6;
 
     private double dungeonBookLevelDecay = 0.5;
@@ -211,7 +211,7 @@ public class EnchantmentSettings {
     public double getAdvancedChanceMultiplier() { return advancedChanceMultiplier; }
     public double getAdvancedLootLevelDecay() { return advancedLootLevelDecay; }
 
-    /** Vùng cấp này đã đủ để loot ra đồ / sách Advanced chưa. */
+    /** Is a region of this level high enough to drop Advanced items / books? */
     public boolean allowsAdvancedLoot(int difficultyLevel) { return difficultyLevel >= advancedMinLevel; }
 
     public boolean isDungeonBookAuto() { return dungeonBookAuto; }
@@ -250,7 +250,7 @@ public class EnchantmentSettings {
             .orElse(1);
     }
 
-    /** Tỉ lệ cơ sở cao nhất trong bảng (dùng để quy về 0..1 khi tính trần tỉ lệ loot). */
+    /** Highest base chance in the table (used to normalize to 0..1 when computing the loot chance cap). */
     public double getMaxBaseChance() {
         return baseChancePerLevel.values().stream().mapToDouble(Double::doubleValue).max().orElse(0.0);
     }

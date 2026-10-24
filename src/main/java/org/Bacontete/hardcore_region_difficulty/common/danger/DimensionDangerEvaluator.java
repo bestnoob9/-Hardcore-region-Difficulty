@@ -6,6 +6,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.dimension.LevelStem;
 import org.Bacontete.hardcore_region_difficulty.common.config.SmartAutoSettings;
+import org.Bacontete.hardcore_region_difficulty.common.difficulty.LocationMatcher;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -121,9 +122,13 @@ public final class DimensionDangerEvaluator {
         }
     }
 
-    public static int getMaxDifficulty(int baseDifficulty) {
-        if (baseDifficulty <= 0) return 0;
-        if (baseDifficulty >= 4 && baseDifficulty <= 5) return baseDifficulty;
-        return Math.min(7, baseDifficulty + 2);
+    /**
+     * Highest region level inside a dimension of the given base level (see ScalingSettings#levelCapFor):
+     * base + dimension_level_bonus (default +2), or the dimension_level_caps entry, never above the highest level
+     * of the mod.
+     */
+    public static int getMaxDifficulty(ResourceLocation dimensionId, int baseDifficulty,
+                                       org.Bacontete.hardcore_region_difficulty.common.config.ScalingSettings scaling) {
+        return scaling.levelCapFor(dimensionId, baseDifficulty);
     }
 }

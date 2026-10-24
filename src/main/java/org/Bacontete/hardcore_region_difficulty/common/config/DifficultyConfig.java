@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
+import org.Bacontete.hardcore_region_difficulty.common.entity.BossLevel;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +31,7 @@ public class DifficultyConfig {
 
     private volatile Map<String, DifficultyRegion> difficultyRegions = new LinkedHashMap<>();
     private volatile List<DifficultyRegion> regionList = Collections.emptyList();
+    private volatile Map<Integer, DifficultyLevelDef> levelDefs = Collections.emptyMap();
     private volatile ScalingSettings scalingSettings = new ScalingSettings();
     private volatile EnchantmentSettings enchantmentSettings = new EnchantmentSettings();
     private volatile TitleDisplaySettings titleDisplaySettings = new TitleDisplaySettings();
@@ -92,11 +94,28 @@ public class DifficultyConfig {
     }
 
     private void parse(JsonObject data) {
+        Map<Integer, DifficultyLevelDef> levels = new java.util.TreeMap<>();
+        if (data.has("difficulty_levels") && data.get("difficulty_levels").isJsonArray()) {
+            for (JsonElement element : data.getAsJsonArray("difficulty_levels")) {
+                try {
+                    DifficultyLevelDef def = DifficultyLevelDef.fromJson(element.getAsJsonObject());
+                    levels.put(def.getLevel(), def);
+                } catch (Exception e) {
+                    HardcoreRegionDifficulty.LOGGER.warn("Skipping invalid difficulty level entry: {}", e.getMessage());
+                }
+            }
+        }
+        for (DifficultyLevelDef def : levels.values()) {
+            if (!DifficultyIcons.isValid(def.getIcon())) {
+                HardcoreRegionDifficulty.LOGGER.warn("Difficulty level {} has an unknown icon '{}' (default skull is used)", def.getLevel(), def.getIcon());
+            }
+        }
+
         Map<String, DifficultyRegion> regions = new LinkedHashMap<>();
         if (data.has("difficulty_regions") && data.get("difficulty_regions").isJsonArray()) {
             for (JsonElement element : data.getAsJsonArray("difficulty_regions")) {
                 try {
-                    DifficultyRegion region = DifficultyRegion.fromJson(element.getAsJsonObject());
+                    DifficultyRegion region = DifficultyRegion.fromJson(element.getAsJsonObject(), levels);
                     if (!region.hasCriteria()) {
                         HardcoreRegionDifficulty.LOGGER.warn("Region '{}' has no dimensions/biomes/biome_tags/structures and will never match", region.getId());
                     }
@@ -136,6 +155,8 @@ public class DifficultyConfig {
             }
         }
 
+        scaling.setLevelDefs(levels);
+        this.levelDefs = Collections.unmodifiableMap(levels);
         this.regionList = Collections.unmodifiableList(new ArrayList<>(regions.values()));
         this.difficultyRegions = regions;
         this.scalingSettings = scaling;
@@ -231,6 +252,221 @@ public class DifficultyConfig {
         }
         return loadConfig();
     }
+
+    /** Custom level definitions of the file, by level. */
+    public Map<Integer, DifficultyLevelDef> getLevelDefs() { return levelDefs; }
+
+    /**
+     * A level that the file defines in "difficulty_levels" above the levels taken by the boss classes
+     * ({@link BossLevel#lastConfigLevel()}) is allowed for regions (regions are normally capped at 5;
+     * the boss classes only use their entries for the boss title and never as a region level).
+     */
+    public boolean isUnlockedLevel(int level) {
+        return level > BossLevel.lastConfigLevel() && level <= BossLevel.MAX_CUSTOM_LEVEL && levelDefs.containsKey(level);
+    }
+
+    /** Icon of the level definition, or "" (default skull). */
+    public String levelIcon(int level) {
+        DifficultyLevelDef def = levelDefs.get(level);
+        return def == null ? "" : def.getIcon();
+    }
+
+    /** Title color of the level definition, or "". */
+    public String levelColor(int level) {
+        DifficultyLevelDef def = levelDefs.get(level);
+        return def == null ? "" : def.getTitleColor();
+    }
+
+    /**
+     * Replaces "difficulty_regions" and "difficulty_levels" in the file (everything else is kept).
+     * The new data is used after the next reload (the server reloads on its own when the file changes);
+     * call {@link #loadConfig()} to use it at once. Returns false if the file could not be read or written.
+     */
+    public synchronized boolean writeRegionsAndLevels(com.google.gson.JsonArray regions, com.google.gson.JsonArray levels) {
+        return writeRegionsAndLevels(regions, levels, null);
+    }
+
+    /** Same, and also merges the given keys into "scaling_settings" (other keys of it are kept). */
+    public synchronized boolean writeRegionsAndLevels(com.google.gson.JsonArray regions, com.google.gson.JsonArray levels,
+                                                      JsonObject scalingPatch) {
+        if (!configFile.exists()) {
+            writeDefaultConfig();
+        }
+        JsonObject root;
+        try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+            JsonElement element = GSON.fromJson(reader, JsonElement.class);
+            if (element == null || !element.isJsonObject()) {
+                HardcoreRegionDifficulty.LOGGER.error("Config root must be a JSON object, not changing {}", configFile);
+                return false;
+            }
+            root = element.getAsJsonObject();
+        } catch (Exception e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not read {} to change the regions", configFile, e);
+            return false;
+        }
+        if (regions != null) {
+            root.add("difficulty_regions", regions); // null = keep the regions of the file
+        }
+        root.add("difficulty_levels", levels);
+        if (scalingPatch != null) {
+            JsonObject scaling = root.has("scaling_settings") && root.get("scaling_settings").isJsonObject()
+                    ? root.getAsJsonObject("scaling_settings") : new JsonObject();
+            for (var entry : scalingPatch.entrySet()) {
+                scaling.add(entry.getKey(), entry.getValue());
+            }
+            root.add("scaling_settings", scaling);
+        }
+        try (Writer writer = Files.newBufferedWriter(configFile.toPath(), StandardCharsets.UTF_8)) {
+            WRITE_GSON.toJson(root, writer);
+        } catch (IOException e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not write {}", configFile, e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Saves what the Scan tab edits: level overrides into smart_auto_settings.structure_levels / dimension_levels,
+     * and the scan_* regions (custom mob stats of one structure or dimension) into difficulty_regions: a region
+     * with the same id is replaced, ids in removeRegionIds are deleted. Everything else is kept.
+     * Call {@link #loadConfig()} afterwards to use it at once. Returns false if the file could not be read or written.
+     */
+    public synchronized boolean writeScanOverrides(Map<String, Integer> structureLevels, Map<String, Integer> dimensionLevels,
+                                                   List<JsonObject> upsertRegions, java.util.Set<String> removeRegionIds,
+                                                   java.util.Set<String> resetStructures, java.util.Set<String> resetDimensions) {
+        if (!configFile.exists()) {
+            writeDefaultConfig();
+        }
+        JsonObject root;
+        try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+            JsonElement element = GSON.fromJson(reader, JsonElement.class);
+            if (element == null || !element.isJsonObject()) {
+                HardcoreRegionDifficulty.LOGGER.error("Config root must be a JSON object, not changing {}", configFile);
+                return false;
+            }
+            root = element.getAsJsonObject();
+        } catch (Exception e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not read {} to save the scan edits", configFile, e);
+            return false;
+        }
+        JsonObject smart = root.has("smart_auto_settings") && root.get("smart_auto_settings").isJsonObject()
+                ? root.getAsJsonObject("smart_auto_settings") : new JsonObject();
+        mergeLevels(smart, "structure_levels", structureLevels, resetStructures);
+        mergeLevels(smart, "dimension_levels", dimensionLevels, resetDimensions);
+        root.add("smart_auto_settings", smart);
+
+        com.google.gson.JsonArray old = root.has("difficulty_regions") && root.get("difficulty_regions").isJsonArray()
+                ? root.getAsJsonArray("difficulty_regions") : new com.google.gson.JsonArray();
+        com.google.gson.JsonArray regions = new com.google.gson.JsonArray();
+        java.util.Set<String> replaced = new java.util.HashSet<>();
+        for (JsonObject r : upsertRegions) replaced.add(r.get("id").getAsString());
+        for (JsonElement e : old) {
+            String id = e.isJsonObject() && e.getAsJsonObject().has("id") && e.getAsJsonObject().get("id").isJsonPrimitive()
+                    ? e.getAsJsonObject().get("id").getAsString() : null;
+            if (id != null && (replaced.contains(id) || removeRegionIds.contains(id))) continue;
+            regions.add(e);
+        }
+        for (JsonObject r : upsertRegions) regions.add(r);
+        root.add("difficulty_regions", regions);
+        try (Writer writer = Files.newBufferedWriter(configFile.toPath(), StandardCharsets.UTF_8)) {
+            WRITE_GSON.toJson(root, writer);
+        } catch (IOException e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not write {}", configFile, e);
+            return false;
+        }
+        return true;
+    }
+
+    private static void mergeLevels(JsonObject smart, String key, Map<String, Integer> values, java.util.Set<String> reset) {
+        if ((values == null || values.isEmpty()) && (reset == null || reset.isEmpty())) return;
+        JsonObject old = smart.has(key) && smart.get(key).isJsonObject() ? smart.getAsJsonObject(key) : new JsonObject();
+        // The game takes the FIRST entry that matches, so the new exact ids go first: an older pattern such as
+        // "deeperdarker:*" must not hide them.
+        JsonObject target = new JsonObject();
+        if (values != null) {
+            for (Map.Entry<String, Integer> e : values.entrySet()) {
+                target.addProperty(e.getKey(), e.getValue());
+            }
+        }
+        for (Map.Entry<String, JsonElement> e : old.entrySet()) {
+            if (target.has(e.getKey())) continue;
+            if (reset != null && reset.contains(e.getKey())) continue;
+            target.add(e.getKey(), e.getValue());
+        }
+        smart.add(key, target);
+    }
+
+    /**
+     * Writes the mob whitelists: "whitelist_entities" of scaling_settings and "entity_whitelist" of the regions
+     * with the given ids (an empty list removes the key of a region). Everything else is kept.
+     */
+    public synchronized boolean writeWhitelists(List<MobEntry> global, Map<String, List<MobEntry>> regionLists) {
+        if (!configFile.exists()) {
+            writeDefaultConfig();
+        }
+        JsonObject root;
+        try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+            JsonElement element = GSON.fromJson(reader, JsonElement.class);
+            if (element == null || !element.isJsonObject()) {
+                HardcoreRegionDifficulty.LOGGER.error("Config root must be a JSON object, not changing {}", configFile);
+                return false;
+            }
+            root = element.getAsJsonObject();
+        } catch (Exception e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not read {} to change the whitelists", configFile, e);
+            return false;
+        }
+        JsonObject scaling = root.has("scaling_settings") && root.get("scaling_settings").isJsonObject()
+                ? root.getAsJsonObject("scaling_settings") : new JsonObject();
+        scaling.add("whitelist_entities", entriesToJson(global));
+        root.add("scaling_settings", scaling);
+        if (root.has("difficulty_regions") && root.get("difficulty_regions").isJsonArray()) {
+            for (JsonElement element : root.getAsJsonArray("difficulty_regions")) {
+                if (!element.isJsonObject() || !element.getAsJsonObject().has("id")) {
+                    continue;
+                }
+                JsonObject region = element.getAsJsonObject();
+                List<MobEntry> list = regionLists.get(region.get("id").getAsString());
+                if (list == null) {
+                    continue;
+                }
+                if (!list.isEmpty()) {
+                    region.add("entity_whitelist", entriesToJson(list));
+                } else {
+                    region.remove("entity_whitelist");
+                }
+            }
+        }
+        try (Writer writer = Files.newBufferedWriter(configFile.toPath(), StandardCharsets.UTF_8)) {
+            WRITE_GSON.toJson(root, writer);
+        } catch (IOException e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not write {}", configFile, e);
+            return false;
+        }
+        return true;
+    }
+
+    private static com.google.gson.JsonArray entriesToJson(List<MobEntry> entries) {
+        com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+        for (MobEntry entry : entries) {
+            if (entry != null && !entry.getPattern().isBlank()) {
+                array.add(entry.toJson());
+            }
+        }
+        return array;
+    }
+
+    private static com.google.gson.JsonArray toJsonArray(List<String> values) {
+        com.google.gson.JsonArray array = new com.google.gson.JsonArray();
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                array.add(v.trim());
+            }
+        }
+        return array;
+    }
+
+    public File getConfigFile() { return configFile; }
 
     public Map<String, DifficultyRegion> getDifficultyRegions() { return difficultyRegions; }
 

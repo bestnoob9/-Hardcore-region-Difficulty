@@ -169,7 +169,9 @@ public class DangerAnalyzer {
     }
 
     public record SpawnerReport(boolean enabled, int radius, int count, int spawnerLevel,
-                                boolean decisive, DangerResult overall) {}
+                                boolean decisive, DangerResult overall,
+                                boolean enemiesEnabled, int enemyRadius, int enemyCount, int enemyLevel,
+                                boolean enemyDecisive) {}
 
     public static SpawnerReport reportAt(Level level, BlockPos pos) {
         SmartAutoSettings settings = settings();
@@ -190,8 +192,16 @@ public class DangerAnalyzer {
                 && spawners.difficultyLevel > biomeOnly.difficultyLevel
                 && spawners.difficultyLevel > dimensionOnly.difficultyLevel
                 && spawners.difficultyLevel > enemies.difficultyLevel;
+        boolean enemyDecisive = enemies.isDangerous && overall.isDangerous
+                && overall.difficultyLevel == enemies.difficultyLevel
+                && enemies.difficultyLevel > structure.difficultyLevel
+                && enemies.difficultyLevel > biomeOnly.difficultyLevel
+                && enemies.difficultyLevel > dimensionOnly.difficultyLevel
+                && enemies.difficultyLevel > spawners.difficultyLevel;
         return new SpawnerReport(settings.analyzeSpawners(), settings.spawnerScanRadius(), spawnerCount,
-                spawners.difficultyLevel, decisive, overall);
+                spawners.difficultyLevel, decisive, overall,
+                settings.analyzeEnemies(), settings.enemyScanRadius(), enemyCount, enemies.difficultyLevel,
+                enemyDecisive);
     }
 
     public static DangerResult analyzeStructure(List<StructureLookup.Hit> hits) {
@@ -207,6 +217,27 @@ public class DangerAnalyzer {
             best = new DangerResult(rating.level(), name, label + roman(rating.level()), name, true);
         }
         return best;
+    }
+
+    /** True if a structure at this spot has a level you set yourself (structure_levels) equal to the given one. */
+    public static boolean hasOverrideLevel(List<StructureLookup.Hit> hits, int level) {
+        if (hits == null) return false;
+        SmartAutoSettings settings = settings();
+        for (StructureLookup.Hit hit : hits) {
+            Predicate<ResourceLocation> tagTest = tag -> hit.holder().is(TagKey.<Structure>create(Registries.STRUCTURE, tag));
+            Integer override = firstMatch(settings.structureLevels(), hit.id(), tagTest);
+            if (override != null && override == level) return true;
+        }
+        return false;
+    }
+
+    /** Same result with another level; the number at the end of the title is replaced. */
+    public static DangerResult withLevel(DangerResult r, int level) {
+        if (r.difficultyLevel == level) return r;
+        String title = r.difficultyTitle;
+        int space = title == null ? -1 : title.lastIndexOf(' ');
+        if (space >= 0) title = title.substring(0, space + 1) + roman(level);
+        return new DangerResult(level, r.regionName, title, r.structureName, r.isDangerous);
     }
 
     public record Resolved(StructureClassifier.Rating rating, String source) {}
@@ -255,7 +286,10 @@ public class DangerAnalyzer {
         try {
             if (inStructureTag(holder, "ignore")) return StructureClassifier.Rating.SAFE;
             int level = 0;
-            for (int l = 5; l >= 1; l--) {
+            DifficultyConfig cfg = DifficultyConfig.getInstance();
+            int top = Math.max(5, cfg == null ? 5 : cfg.getScalingSettings().maxRegionLevel());
+            // tags level_6, level_7... work for the levels the player adds
+            for (int l = top; l >= 1; l--) {
                 if (inStructureTag(holder, "level_" + l)) {
                     level = l;
                     break;

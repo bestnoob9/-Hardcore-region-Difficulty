@@ -1,40 +1,51 @@
 package org.Bacontete.hardcore_region_difficulty.common.network;
 
 import net.minecraft.network.FriendlyByteBuf;
+import org.Bacontete.hardcore_region_difficulty.common.entity.BossLevel;
 
 public class BossTitlePacket {
     private final String entityName;
-    private final String bossTypeKey;
 
-    private final int bossLevel;
+    private final BossLevel bossLevel;
 
-    public BossTitlePacket(String entityName, String bossTypeKey, int bossLevel) {
+    /** Icon of the boss ("" = default skull of the boss class) and title color (0xRRGGBB, -1 = default). */
+    private final String icon;
+    private final int titleColor;
+
+    public BossTitlePacket(String entityName, BossLevel bossLevel, String icon, int titleColor) {
+        this.icon = icon == null ? "" : icon;
+        this.titleColor = titleColor;
         this.entityName = entityName == null ? "" : entityName;
-        this.bossTypeKey = bossTypeKey == null ? "" : bossTypeKey;
         this.bossLevel = bossLevel;
     }
 
     public BossTitlePacket(FriendlyByteBuf buffer) {
         this.entityName = buffer.readUtf();
-        this.bossTypeKey = buffer.readUtf();
-        this.bossLevel = buffer.readVarInt();
+        this.bossLevel = buffer.readEnum(BossLevel.class);
+        this.icon = buffer.readUtf();
+        this.titleColor = buffer.readInt();
     }
 
     public void encode(FriendlyByteBuf buffer) {
         buffer.writeUtf(entityName);
-        buffer.writeUtf(bossTypeKey);
-        buffer.writeVarInt(bossLevel);
+        buffer.writeEnum(bossLevel);
+        buffer.writeUtf(icon);
+        buffer.writeInt(titleColor);
     }
 
     public String getEntityName() {
         return entityName;
     }
 
-    public String getBossTypeKey() {
-        return bossTypeKey;
+    public BossLevel getBossLevel() {
+        return bossLevel;
     }
 
-    public int getBossLevel() {
-        return bossLevel;
+    public String getIcon() {
+        return icon;
+    }
+
+    public int getTitleColor() {
+        return titleColor;
     }
 }

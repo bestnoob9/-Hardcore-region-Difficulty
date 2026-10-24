@@ -129,7 +129,7 @@ public final class DangerScanner {
         paste.add("structure_levels", pasteStructures);
 
         JsonObject root = new JsonObject();
-        root.addProperty("_help", "Generated automatically at server start (or by /hrd scan). 'source': override = your config, tag = datapack tag hardcore_region_difficulty:level_1..5 / bosses / ignore, table = vanilla table, "
+        root.addProperty("_help", "Generated automatically at server start (or by /hrd scan). 'source': override = your config, tag = datapack tag hardcore_region_difficulty:level_1.. (also level_6+ for levels you add) / bosses / ignore, table = vanilla table, "
                 + "words = guessed from the id, spawns = structure defines monster spawns, unknown_level = unknown_structure_level, "
                 + "village_tag = tagged minecraft:village, unknown = not recognised (ignored). To rate a structure copy "
                 + "its id into smart_auto_settings.structure_levels (0 = ignore, 1-5 = level), or add it to one of the datapack tags (no config edit needed). Dimensions are rated too: "
@@ -144,7 +144,7 @@ public final class DangerScanner {
         spawnerInfo.addProperty("analyze_spawners", settings.analyzeSpawners());
         spawnerInfo.addProperty("spawner_scan_radius", settings.spawnerScanRadius());
         JsonObject thresholds = new JsonObject();
-        settings.spawnerLevelThresholds().forEach((lvl, min) -> thresholds.addProperty(String.valueOf(lvl), min));
+        settings.effectiveSpawnerThresholds().forEach((lvl, min) -> thresholds.addProperty(String.valueOf(lvl), min));
         spawnerInfo.add("spawner_level_thresholds", thresholds);
         spawnerInfo.addProperty("_help", "Monster spawner blocks within the radius raise the level (key = level, value = minimum spawner count). "
                 + "Spawners are counted around a position, so the numbers for your location are shown by /hrd scan in chat.");
