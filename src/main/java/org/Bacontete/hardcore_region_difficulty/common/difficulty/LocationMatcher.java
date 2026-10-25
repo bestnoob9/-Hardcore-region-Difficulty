@@ -51,7 +51,8 @@ public class LocationMatcher {
                 "Difficulty " + DangerAnalyzer.roman(max), max,
                 region.getDimensions(), region.getBiomes(), region.getBiomeTags(), region.getStructures(),
                 config.levelIcon(max), config.levelColor(max), region.getMobEntries())
-                .withLootOverride(region.getLootOverride());
+                .withLootOverride(region.getLootOverride())
+                .withEliteEnabled(region.getEliteEnabled());
         return new Match(capped, raw.structureName(), raw.dimensionWide());
     }
 
@@ -172,7 +173,8 @@ public class LocationMatcher {
                                 danger.regionName, d.getDifficultyTitle(), d.getDifficultyLevel(),
                                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
                                 Collections.emptyList(), d.getIcon(), d.getTitleColor(), d.getMobEntries())
-                                .withLootOverride(d.getLootOverride());
+                                .withLootOverride(d.getLootOverride())
+                                .withEliteEnabled(d.getEliteEnabled());
                         return new Match(named, danger.structureName, false);
                     }
                     return dimensionBest;

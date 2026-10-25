@@ -57,7 +57,12 @@ public final class EliteSettings {
 
     /** Chance (0..1) that a mob of this level becomes elite: base + (level - min_level) * per_level. */
     public double chanceFor(int level) {
-        if (!enabled || level < minLevel) {
+        return chanceFor(level, enabled);
+    }
+
+    /** Same, with the elite switch given (a region can force it on or off instead of the global elite_enabled). */
+    public double chanceFor(int level, boolean spawnEnabled) {
+        if (!spawnEnabled || level < minLevel) {
             return 0.0D;
         }
         return clamp01(baseChance + (level - minLevel) * chancePerLevel);

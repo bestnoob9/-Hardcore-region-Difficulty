@@ -323,8 +323,8 @@ public class HardcoreRegionDifficultyForge {
         sb.append("\nSpawners within ").append(r.radius()).append(" blocks: ").append(r.count());
         if (r.spawnerLevel() > 0) {
             sb.append(" -> spawner level ").append(r.spawnerLevel())
-                    .append(r.decisive() ? " (decides the level here)" : " (not the highest: " + r.overall().regionName
-                                                                         + ", level " + r.overall().difficultyLevel + ", wins)");
+              .append(r.decisive() ? " (decides the level here)" : " (not the highest: " + r.overall().regionName
+                      + ", level " + r.overall().difficultyLevel + ", wins)");
         } else {
             sb.append(" -> below the thresholds, no spawner level");
         }
@@ -336,8 +336,8 @@ public class HardcoreRegionDifficultyForge {
         sb.append("\nHostile mobs within ").append(r.enemyRadius()).append(" blocks: ").append(r.enemyCount());
         if (r.enemyLevel() > 0) {
             sb.append(" -> enemy level ").append(r.enemyLevel())
-                    .append(r.enemyDecisive() ? " (decides the level here)" : " (not the highest, " + r.overall().regionName
-                                                                              + " level " + r.overall().difficultyLevel + " wins)");
+              .append(r.enemyDecisive() ? " (decides the level here)" : " (not the highest, " + r.overall().regionName
+                      + " level " + r.overall().difficultyLevel + " wins)");
         } else {
             sb.append(" -> below the thresholds, no enemy level");
         }
@@ -372,11 +372,11 @@ public class HardcoreRegionDifficultyForge {
                                 DangerScanner.Summary sm = DangerScanner.run(ctx.getSource().getServer(), config.getConfigDirectory());
                                 StringBuilder sb = new StringBuilder();
                                 sb.append("Scan: ").append(sm.structures()).append(" structures (")
-                                        .append(sm.dangerous()).append(" dangerous, ").append(sm.ignored()).append(" safe/ignored, ")
-                                        .append(sm.unknown()).append(" unknown), ")
-                                        .append(sm.biomes()).append(" biomes (").append(sm.dangerousBiomes()).append(" dangerous), ")
-                                        .append(sm.dimensions()).append(" dimensions (")
-                                        .append(sm.dangerousDimensions()).append(" rated).");
+                                  .append(sm.dangerous()).append(" dangerous, ").append(sm.ignored()).append(" safe/ignored, ")
+                                  .append(sm.unknown()).append(" unknown), ")
+                                  .append(sm.biomes()).append(" biomes (").append(sm.dangerousBiomes()).append(" dangerous), ")
+                                  .append(sm.dimensions()).append(" dimensions (")
+                                  .append(sm.dangerousDimensions()).append(" rated).");
                                 if (!sm.unknownByNamespace().isEmpty()) {
                                     sb.append("\nUnknown structures by mod:");
                                     int shown = 0;
@@ -456,7 +456,7 @@ public class HardcoreRegionDifficultyForge {
                 .withStyle(net.minecraft.ChatFormatting.YELLOW);
 
         out.append("\n").append(label(K + "dimension", "Dimension: "))
-                .append(copyable(level.dimension().location().toString()));
+           .append(copyable(level.dimension().location().toString()));
 
         var biome = level.getBiome(pos);
         var biomeKey = biome.unwrapKey();
@@ -580,11 +580,11 @@ public class HardcoreRegionDifficultyForge {
                 continue;
             }
             result.append(Component.literal(category.name().toLowerCase(Locale.ROOT))
-                            .withStyle(net.minecraft.ChatFormatting.BOLD))
-                    .append(Component.literal(" (").withStyle(net.minecraft.ChatFormatting.GRAY))
-                    .append(Component.translatable("hardcore_region_difficulty.quality.category." + category.name())
-                            .withStyle(net.minecraft.ChatFormatting.GRAY))
-                    .append(Component.literal("):\n").withStyle(net.minecraft.ChatFormatting.GRAY));
+                    .withStyle(net.minecraft.ChatFormatting.BOLD))
+                  .append(Component.literal(" (").withStyle(net.minecraft.ChatFormatting.GRAY))
+                  .append(Component.translatable("hardcore_region_difficulty.quality.category." + category.name())
+                          .withStyle(net.minecraft.ChatFormatting.GRAY))
+                  .append(Component.literal("):\n").withStyle(net.minecraft.ChatFormatting.GRAY));
             List<QualityType> list = new ArrayList<>(category.getAllowed());
             list.sort(Comparator.comparingInt(QualityType::getTier));
             if (list.isEmpty()) {

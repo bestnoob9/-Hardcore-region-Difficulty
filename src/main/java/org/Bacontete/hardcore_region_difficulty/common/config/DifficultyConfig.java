@@ -401,6 +401,15 @@ public class DifficultyConfig {
      * with the given ids (an empty list removes the key of a region). Everything else is kept.
      */
     public synchronized boolean writeWhitelists(List<MobEntry> global, Map<String, List<MobEntry>> regionLists) {
+        return writeWhitelists(global, regionLists, null);
+    }
+
+    /**
+     * Same, and also the elite switch of the regions: "elite_enabled" is set to true / false for the given ids,
+     * removed when the value is null (= follow the global setting). Regions not in the map are not touched.
+     */
+    public synchronized boolean writeWhitelists(List<MobEntry> global, Map<String, List<MobEntry>> regionLists,
+                                                Map<String, Boolean> regionElite) {
         if (!configFile.exists()) {
             writeDefaultConfig();
         }
@@ -427,6 +436,14 @@ public class DifficultyConfig {
                 }
                 JsonObject region = element.getAsJsonObject();
                 List<MobEntry> list = regionLists.get(region.get("id").getAsString());
+                if (regionElite != null && regionElite.containsKey(region.get("id").getAsString())) {
+                    Boolean elite = regionElite.get(region.get("id").getAsString());
+                    if (elite == null) {
+                        region.remove("elite_enabled");
+                    } else {
+                        region.addProperty("elite_enabled", elite);
+                    }
+                }
                 if (list == null) {
                     continue;
                 }

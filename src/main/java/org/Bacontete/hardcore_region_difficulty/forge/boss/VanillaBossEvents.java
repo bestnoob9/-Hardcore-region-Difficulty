@@ -5,7 +5,9 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.boss.wither.WitherBoss;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.Bacontete.hardcore_region_difficulty.forge.ForgeConfig;
@@ -70,6 +72,34 @@ public class VanillaBossEvents {
         double ratio = old > 0.0D ? Math.min(1.0D, living.getHealth() / old) : 1.0D;
         attribute.setBaseValue(target);
         living.setHealth((float) (ratio * target));
+    }
+
+    /** Duration of the Wither spawn charge (vanilla). */
+    private static final float WITHER_SPAWN_CHARGE_TICKS = 220.0F;
+
+    /**
+     * Vanilla heals the Wither by 10 HP every 10 ticks while it charges (22 times = 220 HP), enough to go from 1/3 to full
+     * health with the vanilla 300 HP but not with a bigger health pool. The health therefore follows the charge here: it
+     * is at least 1/3 at the start and exactly full when the charge ends.
+     */
+    @SubscribeEvent
+    public void onWitherTick(LivingEvent.LivingTickEvent event) {
+        if (!(event.getEntity() instanceof WitherBoss wither) || wither.level().isClientSide()
+                || !ForgeConfig.isEnabled()) {
+            return;
+        }
+        int invulnerable = wither.getInvulnerableTicks();
+        if (invulnerable <= 0 || wither.getHealth() <= 0.0F) {
+            return;
+        }
+        float progress = Math.min(1.0F, Math.max(0.0F, 1.0F - invulnerable / WITHER_SPAWN_CHARGE_TICKS));
+        float target = wither.getMaxHealth() * (1.0F / 3.0F + 2.0F / 3.0F * progress);
+        if (invulnerable <= 1) {
+            target = wither.getMaxHealth();
+        }
+        if (wither.getHealth() < target) {
+            wither.setHealth(target);
+        }
     }
 
     @SubscribeEvent

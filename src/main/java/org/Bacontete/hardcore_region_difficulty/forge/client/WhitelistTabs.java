@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyRegion;
 import org.Bacontete.hardcore_region_difficulty.common.config.MobEntry;
+import org.Bacontete.hardcore_region_difficulty.common.elite.EliteMode;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -149,6 +150,7 @@ public final class WhitelistTabs {
         tab.addEntry(globalGroup.build());
 
         Map<String, ListModel> perRegion = new LinkedHashMap<>();
+        Map<String, Boolean> regionElite = new LinkedHashMap<>();
         SubCategoryBuilder regionsGroup = entries.startSubCategory(t("whitelist.regions")).setExpanded(false);
         regionsGroup.add(entries.startTextDescription(t("whitelist.regions.note")).build());
         for (DifficultyRegion region : cfg.getRegionList()) {
@@ -161,6 +163,12 @@ public final class WhitelistTabs {
                     + region.getDifficultyLevel()
                     + (list.entries.isEmpty() ? "" : "  (" + list.entries.size() + ")"));
             SubCategoryBuilder sub = entries.startSubCategory(title).setExpanded(false);
+            sub.add(entries.startEnumSelector(t("elite.region"), EliteMode.class, EliteMode.of(region.getEliteEnabled()))
+                    .setDefaultValue(EliteMode.FOLLOW)
+                    .setEnumNameProvider(v -> t("elite.mode." + ((EliteMode) v).name().toLowerCase(java.util.Locale.ROOT)))
+                    .setTooltip(TooltipWrap.wrap(t("elite.region.tooltip")))
+                    .setSaveConsumer(v -> regionElite.put(region.getId(), v.toBoolean()))
+                    .build());
             addList(entries, sub, list, NEW_REGION_SLOTS);
             regionsGroup.add(sub.build());
         }
@@ -169,7 +177,7 @@ public final class WhitelistTabs {
         return () -> {
             Map<String, List<MobEntry>> regionLists = new LinkedHashMap<>();
             perRegion.forEach((id, list) -> regionLists.put(id, list.toEntries()));
-            boolean ok = cfg.writeWhitelists(global.toEntries(), regionLists);
+            boolean ok = cfg.writeWhitelists(global.toEntries(), regionLists, regionElite);
             // no world running: nothing else would reload it
             if (ok && Minecraft.getInstance().getSingleplayerServer() == null) {
                 cfg.loadConfig();

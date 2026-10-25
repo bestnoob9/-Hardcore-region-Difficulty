@@ -22,6 +22,8 @@ public class DifficultyRegion {
     private final List<MobEntry> mobEntries;
     /** Optional "loot" object of the region: only the keys it sets differ from the global loot settings. */
     private volatile JsonObject lootOverride;
+    /** Optional "elite_enabled" of the region: true / false forces elite spawn here, null follows the global setting. */
+    private volatile Boolean eliteEnabled;
 
     public DifficultyRegion(String id, String regionName, String difficultyTitle,
                             int difficultyLevel, List<String> dimensions, List<String> biomes,
@@ -92,6 +94,10 @@ public class DifficultyRegion {
         if (obj.has("loot") && obj.get("loot").isJsonObject()) {
             region.lootOverride = obj.getAsJsonObject("loot").deepCopy();
         }
+        if (obj.has("elite_enabled") && obj.get("elite_enabled").isJsonPrimitive()
+                && obj.get("elite_enabled").getAsJsonPrimitive().isBoolean()) {
+            region.eliteEnabled = obj.get("elite_enabled").getAsBoolean();
+        }
         return region;
     }
 
@@ -151,6 +157,15 @@ public class DifficultyRegion {
 
     /** The "loot" object of this region (keys of LootSettings), or null if it uses the global loot settings. */
     public JsonObject getLootOverride() { return lootOverride; }
+
+    /** Elite spawn switch of this region: TRUE / FALSE = forced here, null = follows the global elite_enabled. */
+    public Boolean getEliteEnabled() { return eliteEnabled; }
+
+    /** Same value on a copy of the region made by the matcher (level cap, named structure). */
+    public DifficultyRegion withEliteEnabled(Boolean value) {
+        this.eliteEnabled = value;
+        return this;
+    }
 
     /** Same override on a copy of the region made by the matcher (level cap, named structure). */
     public DifficultyRegion withLootOverride(JsonObject override) {

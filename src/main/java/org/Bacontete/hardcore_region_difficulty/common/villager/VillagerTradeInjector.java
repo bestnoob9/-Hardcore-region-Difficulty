@@ -155,8 +155,8 @@ public class VillagerTradeInjector {
                 emeralds,
                 offer.getCostB(),
                 advancedBook,
-                0,
-                settings.getLibrarianMaxUses(),
+                0,                              
+                settings.getLibrarianMaxUses(), 
                 offer.getXp(),
                 offer.getPriceMultiplier());
     }

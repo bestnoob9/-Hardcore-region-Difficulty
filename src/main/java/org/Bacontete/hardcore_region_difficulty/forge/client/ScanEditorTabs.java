@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.ScalingSettings;
 import org.Bacontete.hardcore_region_difficulty.common.danger.DangerAnalyzer;
+import org.Bacontete.hardcore_region_difficulty.common.elite.EliteMode;
 import org.Bacontete.hardcore_region_difficulty.common.danger.DangerScanner;
 import org.Bacontete.hardcore_region_difficulty.common.difficulty.PatternMatcher;
 
@@ -71,6 +72,9 @@ public final class ScanEditorTabs {
         double damage;
         double armor;
         double speed;
+        /** Elite spawn here: follow the global switch, or forced on / off (saved in the scan_ region of the entry). */
+        EliteMode elite = EliteMode.FOLLOW;
+        EliteMode initialElite = EliteMode.FOLLOW;
         boolean hadRegion;
         String regionId;
         boolean reset;
@@ -172,6 +176,11 @@ public final class ScanEditorTabs {
         JsonObject stats = null;
         if (region != null) {
             r.hadRegion = true;
+            if (region.has("elite_enabled") && region.get("elite_enabled").isJsonPrimitive()
+                    && region.get("elite_enabled").getAsJsonPrimitive().isBoolean()) {
+                r.elite = EliteMode.of(region.get("elite_enabled").getAsBoolean());
+                r.initialElite = r.elite;
+            }
             if (region.has("difficulty_level") && region.get("difficulty_level").isJsonPrimitive()) {
                 r.level = region.get("difficulty_level").getAsInt();
             }
@@ -218,6 +227,12 @@ public final class ScanEditorTabs {
                     .setTooltip(TooltipWrap.wrap(t(r.dimension ? "scan.level.tooltip.dimension" : "scan.level.tooltip.structure")))
                     .setSaveConsumer(v -> r.level = v)
                     .build());
+            sub.add(e.startEnumSelector(t("elite.region"), EliteMode.class, r.elite)
+                    .setDefaultValue(EliteMode.FOLLOW)
+                    .setEnumNameProvider(v -> t("elite.mode." + ((EliteMode) v).name().toLowerCase(Locale.ROOT)))
+                    .setTooltip(TooltipWrap.wrap(t("elite.scan.tooltip")))
+                    .setSaveConsumer(v -> r.elite = v)
+                    .build());
             sub.add(e.startBooleanToggle(t("scan.custom_stats"), r.customStats)
                     .setDefaultValue(false)
                     .setTooltip(TooltipWrap.wrap(t("scan.custom_stats.tooltip")))
@@ -258,8 +273,9 @@ public final class ScanEditorTabs {
                 continue;
             }
             boolean withStats = r.customStats && r.level >= 1;
-            if (withStats) {
-                upsert.add(region(r));
+            boolean withElite = r.elite != EliteMode.FOLLOW && r.level >= 1;
+            if (withStats || withElite) {
+                upsert.add(region(r, withStats));
             } else if (r.hadRegion) {
                 remove.add(r.regionId);
             }
@@ -345,7 +361,7 @@ public final class ScanEditorTabs {
         return null;
     }
 
-    private static JsonObject region(Row r) {
+    private static JsonObject region(Row r, boolean withStats) {
         JsonObject o = new JsonObject();
         o.addProperty("id", r.regionId);
         o.addProperty("region_name", DangerAnalyzer.prettify(r.id.contains(":") ? r.id.substring(r.id.indexOf(':') + 1) : r.id));
@@ -356,6 +372,13 @@ public final class ScanEditorTabs {
         o.add("biomes", new JsonArray());
         o.add("biome_tags", new JsonArray());
         o.add("structures", r.dimension ? new JsonArray() : target);
+        if (r.elite != EliteMode.FOLLOW) {
+            o.addProperty("elite_enabled", r.elite == EliteMode.ON);
+        }
+        if (!withStats) {
+            // only the elite switch: no mob whitelist, the mobs follow the formula of the level
+            return o;
+        }
         JsonObject stats = new JsonObject();
         stats.addProperty("entity", "*");
         stats.addProperty("health_bonus_percent", r.health);

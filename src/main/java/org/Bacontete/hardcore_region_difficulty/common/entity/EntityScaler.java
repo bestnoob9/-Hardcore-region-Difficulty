@@ -120,7 +120,7 @@ public class EntityScaler {
         if (regionLevel <= 1 && bossLevel == null && !config.getScalingSettings().hasCustom(regionLevel)
                 && (entry == null || !entry.hasStatOverride())) {
             // not scaled, but a low elite_min_level can still make it elite
-            tryElite(mob, regionLevel, bossLevel, config.getScalingSettings());
+            tryElite(mob, regionLevel, bossLevel, config.getScalingSettings(), region);
             return;
         }
 
@@ -133,7 +133,7 @@ public class EntityScaler {
             data.putFloat(HEAL_TAG, oldMax);
         }
         // elite roll comes after the scaling, so the affixes work on top of the scaled stats
-        tryElite(mob, regionLevel, bossLevel, config.getScalingSettings());
+        tryElite(mob, regionLevel, bossLevel, config.getScalingSettings(), region);
 
         HardcoreRegionDifficulty.LOGGER.debug("Scaled {} at difficulty level {}{}",
                 mob.getType().getDescription().getString(), regionLevel, raidLevel > 0 ? " (raid)" : "");
@@ -255,9 +255,10 @@ public class EntityScaler {
     }
 
     /** Rolls the elite affixes of a mob (once, together with the scaling). Bosses are never elite. */
-    private static void tryElite(Mob mob, int level, BossLevel bossLevel, ScalingSettings scaling) {
+    private static void tryElite(Mob mob, int level, BossLevel bossLevel, ScalingSettings scaling,
+                                 DifficultyRegion region) {
         if (bossLevel == null) {
-            EliteManager.tryRoll(mob, level, scaling);
+            EliteManager.tryRoll(mob, level, scaling, region != null ? region.getEliteEnabled() : null);
         }
     }
 

@@ -1,6 +1,16 @@
 # Changelog
 
+## Update 1.0.5
+
+## Changed
+- **True Damage book trade.** Only Master librarians can sell it (0.025% chance). Its loot chance is also 0.025% and it is now Very Rare.
+
+## Fixed
+- The Wither did not reach full health after its spawn charge when its max health was raised.
+
 ## Update 1.0.4
+
+## Fixed
 
 - Villager trades fix
 

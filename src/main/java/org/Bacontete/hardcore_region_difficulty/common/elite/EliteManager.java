@@ -50,8 +50,17 @@ public final class EliteManager {
      * @return true when the mob became elite
      */
     public static boolean tryRoll(Mob mob, int level, ScalingSettings scaling) {
+        return tryRoll(mob, level, scaling, null);
+    }
+
+    /**
+     * @param regionSwitch elite switch of the region / structure of the mob: TRUE / FALSE forces elite spawn there,
+     *                     null follows the global elite_enabled
+     */
+    public static boolean tryRoll(Mob mob, int level, ScalingSettings scaling, Boolean regionSwitch) {
         EliteSettings settings = scaling.getEliteSettings();
-        if (!settings.isEnabled() || level < settings.getMinLevel() || isElite(mob)) {
+        boolean spawnEnabled = regionSwitch != null ? regionSwitch : settings.isEnabled();
+        if (!spawnEnabled || level < settings.getMinLevel() || isElite(mob)) {
             return false;
         }
         if (mob.hasCustomName()) {
@@ -67,7 +76,7 @@ public final class EliteManager {
                     mob.getType().getDescription().getString(), level, aliveCount(level), limit);
             return false;
         }
-        double chance = settings.chanceFor(level);
+        double chance = settings.chanceFor(level, spawnEnabled);
         RandomSource random = mob.getRandom();
         if (random.nextDouble() >= chance) {
             return false;
