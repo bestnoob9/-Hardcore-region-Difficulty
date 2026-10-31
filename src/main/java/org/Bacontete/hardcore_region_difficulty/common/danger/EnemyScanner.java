@@ -8,7 +8,6 @@ import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.level.Level;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,14 +36,9 @@ public final class EnemyScanner {
     public static int count(Level level, BlockPos pos, int radius) {
         if (!(level instanceof ServerLevel serverLevel) || radius <= 0) return 0;
         try {
-            int total = 0;
-            List<Mob> mobs = serverLevel.getEntitiesOfClass(Mob.class,
-                    new net.minecraft.world.phys.AABB(pos).inflate(radius));
-            for (Mob mob : mobs) {
-                if (isHostile(mob)) {
-                    total++;
-                }
-            }
+            // the filter runs while the entities are collected: no list of every mob around is built and walked again
+            int total = serverLevel.getEntitiesOfClass(Mob.class,
+                    new net.minecraft.world.phys.AABB(pos).inflate(radius), EnemyScanner::isHostile).size();
             return stabilize(serverLevel, pos, total);
         } catch (Exception e) {
             HardcoreRegionDifficulty.LOGGER.debug("Enemy count failed at {}: {}", pos, e.toString());

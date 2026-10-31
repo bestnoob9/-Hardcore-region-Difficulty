@@ -13,12 +13,21 @@ public class TitleDisplayPacket {
     private final String icon;
     private final int titleColor;
 
+    /** True when HRD's own (old) title rules would show this title; false = only sent for Traveler's Titles. */
+    private final boolean legacyAnnounce;
+
     public TitleDisplayPacket(String regionName, String difficultyTitle, String structureName, int difficultyLevel) {
         this(regionName, difficultyTitle, structureName, difficultyLevel, "", -1);
     }
 
     public TitleDisplayPacket(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
                               String icon, int titleColor) {
+        this(regionName, difficultyTitle, structureName, difficultyLevel, icon, titleColor, true);
+    }
+
+    public TitleDisplayPacket(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
+                              String icon, int titleColor, boolean legacyAnnounce) {
+        this.legacyAnnounce = legacyAnnounce;
         this.icon = icon == null ? "" : icon;
         this.titleColor = titleColor;
         this.difficultyLevel = difficultyLevel;
@@ -34,6 +43,7 @@ public class TitleDisplayPacket {
         this.difficultyLevel = buffer.readVarInt();
         this.icon = buffer.readUtf();
         this.titleColor = buffer.readInt();
+        this.legacyAnnounce = buffer.readBoolean();
     }
 
     public void encode(FriendlyByteBuf buffer) {
@@ -43,6 +53,7 @@ public class TitleDisplayPacket {
         buffer.writeVarInt(difficultyLevel);
         buffer.writeUtf(icon);
         buffer.writeInt(titleColor);
+        buffer.writeBoolean(legacyAnnounce);
     }
 
     public String getRegionName() {
@@ -59,6 +70,10 @@ public class TitleDisplayPacket {
 
     public int getDifficultyLevel() {
         return difficultyLevel;
+    }
+
+    public boolean isLegacyAnnounce() {
+        return legacyAnnounce;
     }
 
     public String getIcon() {

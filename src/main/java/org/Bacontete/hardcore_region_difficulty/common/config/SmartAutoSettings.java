@@ -73,7 +73,7 @@ public final class SmartAutoSettings {
                              Map<Integer, Integer> spawnerLevelThresholds) {
         this(analyzeStructures, analyzeBiomes, unknownStructureLevel, structureSpawnLevel,
                 structureLevels, biomeLevels, analyzeSpawners, spawnerScanRadius, spawnerLevelThresholds,
-                true, DEFAULT_ENEMY_SCAN_RADIUS, DEFAULT_ENEMY_THRESHOLDS,
+                false, DEFAULT_ENEMY_SCAN_RADIUS, DEFAULT_ENEMY_THRESHOLDS,
                 true, DEFAULT_UNKNOWN_DIMENSION_LEVEL, Collections.emptyMap());
     }
 
@@ -112,7 +112,8 @@ public final class SmartAutoSettings {
         int spawn = intOf(obj, "structure_spawn_level", 3);
         boolean spawners = bool(obj, "analyze_spawners", true);
         int radius = intOf(obj, "spawner_scan_radius", DEFAULT_SPAWNER_SCAN_RADIUS);
-        boolean enemies = bool(obj, "analyze_enemies", true);
+        // off by default: counting the hostile mobs around costs TPS, so it is an option
+        boolean enemies = bool(obj, "analyze_enemies", false);
         int enemyRadius = intOf(obj, "enemy_scan_radius", DEFAULT_ENEMY_SCAN_RADIUS);
 
         boolean dimensions = bool(obj, "analyze_dimensions", true);

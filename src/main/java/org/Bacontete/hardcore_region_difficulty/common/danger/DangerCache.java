@@ -57,5 +57,7 @@ public class DangerCache {
         DIMENSION_CACHE.clear();
         SPAWNER_CACHE.clear();
         EnemyScanner.clear();
+        org.Bacontete.hardcore_region_difficulty.common.difficulty.LocationMatcher.clearCaches();
+        org.Bacontete.hardcore_region_difficulty.common.entity.MobTypeCache.clear();
     }
 }

@@ -38,6 +38,23 @@ public final class DifficultyIcons {
         if (icon == null || icon.isBlank()) {
             return null;
         }
+        ResourceLocation cached = TEXTURE_CACHE.get(icon);
+        if (cached != null) {
+            return cached;
+        }
+        ResourceLocation resolved = resolveTexture(icon);
+        if (resolved != null) {
+            if (TEXTURE_CACHE.size() > 128) {
+                TEXTURE_CACHE.clear();
+            }
+            TEXTURE_CACHE.put(icon, resolved);
+        }
+        return resolved;
+    }
+
+    private static final java.util.Map<String, ResourceLocation> TEXTURE_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static ResourceLocation resolveTexture(String icon) {
         String s = icon.trim();
         if (s.contains(":")) {
             return ResourceLocation.tryParse(s);

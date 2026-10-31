@@ -87,3 +87,11 @@ mandatory = false
 versionRange = "[11,)"
 ordering = "NONE"
 side = "CLIENT"
+
+# Optional: with Traveler's Titles installed, its title is shown for regions and HRD only adds the difficulty line under it.
+[[dependencies."${mod_id}"]]
+modId = "travelerstitles"
+mandatory = false
+versionRange = "[0,)"
+ordering = "AFTER"
+side = "CLIENT"

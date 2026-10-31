@@ -162,6 +162,10 @@ public class DangerAnalyzer {
         return SpawnerScanner.count(level, pos, settings.spawnerScanRadius());
     }
 
+    /**
+     * Hostile mobs around the position. Optional (smart_auto_settings.analyze_enemies, off by default): it is the most
+     * expensive part of Smart Auto, so it is only counted when the option is on.
+     */
     public static int countEnemies(Level level, BlockPos pos) {
         SmartAutoSettings settings = settings();
         if (!settings.analyzeEnemies()) return 0;

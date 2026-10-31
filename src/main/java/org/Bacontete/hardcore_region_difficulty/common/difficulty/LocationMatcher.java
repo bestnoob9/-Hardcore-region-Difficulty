@@ -16,6 +16,9 @@ import org.Bacontete.hardcore_region_difficulty.common.danger.DimensionDangerEva
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LocationMatcher {
 
@@ -25,16 +28,42 @@ public class LocationMatcher {
         }
     }
 
+    /**
+     * Smart Auto used to analyse the surroundings (spawners, enemies, structures, dimension danger) every time the player
+     * or a mob was checked. The regions are now saved in the config before the world is entered, so this runtime scan is
+     * switched off: only the saved regions are matched. It is switched on again (true) because the scans are now cheap:
+     * the structure / spawner lookups are cached and mobs / loot / trades reuse a short cache (see {@link #matchCheap}).
+     * The hostile-mob count was removed, Smart Auto no longer looks at the mobs around.
+     */
+    private static final boolean RUNTIME_SMART_AUTO = true;
+
+    private static boolean smartAuto(DifficultyConfig config) {
+        return RUNTIME_SMART_AUTO && config.isSmartAutoEnabled();
+    }
+
     private static final int TIER_DIMENSION = 1;
     private static final int TIER_BIOME_TAG = 2;
     private static final int TIER_BIOME = 3;
     private static final int TIER_STRUCTURE = 4;
 
+    /** Full check (used for players, chests, commands). */
     public static Match match(Level level, BlockPos pos) {
+        return match(level, pos, true);
+    }
+
+    /**
+     * Cheap check for mobs, loot and trades (called very often, e.g. for every mob that spawns): the result is cached
+     * for one second per 8x8x8 block cell. Same result as {@link #match} everywhere else.
+     */
+    public static Match matchCheap(Level level, BlockPos pos) {
+        return match(level, pos, false);
+    }
+
+    private static Match match(Level level, BlockPos pos, boolean full) {
         if (!ForgeConfig.isEnabled()) {
             return null;
         }
-        Match raw = rawMatch(level, pos);
+        Match raw = rawMatch(level, pos, full);
         DifficultyConfig config = DifficultyConfig.getInstance();
         if (raw == null || config == null || level == null) {
             return raw;
@@ -60,13 +89,88 @@ public class LocationMatcher {
         ResourceLocation dimensionId = level.dimension().location();
         DifficultyRegion manual = manualDimensionRegion(config, dimensionId);
         int base = manual != null ? manual.getDifficultyLevel() : 0;
-        if (base <= 0 && config.isSmartAutoEnabled()) {
+        if (base <= 0 && smartAuto(config)) {
             base = DangerAnalyzer.analyzeDimension(level).difficultyLevel;
         }
         return Math.max(1, base);
     }
 
-    private static Match rawMatch(Level level, BlockPos pos) {
+    /** Result of the region match per dimension + biome, valid for one loaded region list (see rawMatch). */
+    private static final Map<String, Optional<Match>> MATCH_CACHE = new ConcurrentHashMap<>();
+    private static volatile List<DifficultyRegion> matchCacheFor;
+
+    /**
+     * Without structure regions (and without the runtime Smart Auto) the result only depends on the dimension and the
+     * biome, so it is computed once per biome and reused for every player check and every mob. The cache is dropped
+     * when the config is reloaded (a new region list).
+     */
+    private static Match rawMatch(Level level, BlockPos pos, boolean full) {
+        DifficultyConfig config = DifficultyConfig.getInstance();
+        if (config != null && level != null && smartAuto(config)) {
+            return full ? computeMatch(level, pos) : cheapSmartMatch(level, pos);
+        }
+        if (config == null || level == null || config.hasStructureRegions()) {
+            return computeMatch(level, pos);
+        }
+        ResourceLocation biomeId = level.getBiome(pos).unwrapKey().map(k -> k.location()).orElse(null);
+        if (biomeId == null) {
+            return computeMatch(level, pos);
+        }
+        List<DifficultyRegion> regions = config.getRegionList();
+        if (matchCacheFor != regions) {
+            MATCH_CACHE.clear();
+            matchCacheFor = regions;
+        }
+        String key = level.dimension().location() + "|" + biomeId;
+        Optional<Match> cached = MATCH_CACHE.get(key);
+        if (cached == null) {
+            cached = Optional.ofNullable(computeMatch(level, pos));
+            if (MATCH_CACHE.size() > 512) {
+                MATCH_CACHE.clear();
+            }
+            MATCH_CACHE.put(key, cached);
+        }
+        return cached.orElse(null);
+    }
+
+    private record SmartKey(ResourceLocation dimension, int x, int y, int z) {}
+
+    private record SmartEntry(Optional<Match> match, long time) {}
+
+    /** Short cache of the smart-auto result for the cheap check (mobs, loot, trades). */
+    private static final Map<SmartKey, SmartEntry> SMART_CACHE = new ConcurrentHashMap<>();
+    private static final long SMART_TTL_TICKS = 20L;
+    private static final int SMART_CACHE_MAX = 4096;
+    private static volatile List<DifficultyRegion> smartCacheFor;
+
+    private static Match cheapSmartMatch(Level level, BlockPos pos) {
+        DifficultyConfig config = DifficultyConfig.getInstance();
+        List<DifficultyRegion> regions = config.getRegionList();
+        if (smartCacheFor != regions) {
+            SMART_CACHE.clear();
+            smartCacheFor = regions;
+        }
+        long now = level.getGameTime();
+        SmartKey key = new SmartKey(level.dimension().location(), pos.getX() >> 3, pos.getY() >> 3, pos.getZ() >> 3);
+        SmartEntry entry = SMART_CACHE.get(key);
+        if (entry != null && now >= entry.time() && now - entry.time() < SMART_TTL_TICKS) {
+            return entry.match().orElse(null);
+        }
+        Match m = computeMatch(level, pos);
+        if (SMART_CACHE.size() > SMART_CACHE_MAX) {
+            SMART_CACHE.clear();
+        }
+        SMART_CACHE.put(key, new SmartEntry(Optional.ofNullable(m), now));
+        return m;
+    }
+
+    /** Drops the cached results (called together with {@link org.Bacontete.hardcore_region_difficulty.common.danger.DangerCache#clear()}). */
+    public static void clearCaches() {
+        SMART_CACHE.clear();
+        MATCH_CACHE.clear();
+    }
+
+    private static Match computeMatch(Level level, BlockPos pos) {
         DifficultyConfig config = DifficultyConfig.getInstance();
         if (config == null || level == null) {
             return null;
@@ -76,10 +180,9 @@ public class LocationMatcher {
         ResourceLocation biomeId = biome.unwrapKey().map(k -> k.location()).orElse(null);
         ResourceLocation dimensionId = level.dimension().location();
 
-        List<StructureLookup.Hit> hits = (config.hasStructureRegions()
-                || (config.isSmartAutoEnabled() && config.getSmartAutoSettings().analyzeStructures()))
-                ? StructureLookup.at(level, pos)
-                : Collections.emptyList();
+        // Structure starts are only looked up when a region really needs them (after its dimension / biome filters
+        // matched), and only once per match - like Dungeon Difficulty resolves them lazily once per location.
+        List<StructureLookup.Hit> hits = null;
 
         Match best = null;       
         int bestTier = 0;
@@ -93,16 +196,7 @@ public class LocationMatcher {
             String structureName = "";
             boolean ok = true;
 
-            if (!region.getStructures().isEmpty()) {
-                StructureLookup.Hit matched = matchStructure(region, hits);
-                if (matched == null) {
-                    ok = false;
-                } else {
-                    tier = TIER_STRUCTURE;
-                    structureName = DangerAnalyzer.prettify(matched.id().getPath());
-                }
-            }
-            if (ok && !region.getBiomes().isEmpty()) {
+            if (!region.getBiomes().isEmpty()) {
                 if (biomeId != null && PatternMatcher.matches(region.getBiomes(), biomeId, tag -> biome.is(TagKey.create(Registries.BIOME, tag)))) {
                     tier = Math.max(tier, TIER_BIOME);
                 } else {
@@ -123,6 +217,18 @@ public class LocationMatcher {
                     ok = false;
                 }
             }
+            if (ok && !region.getStructures().isEmpty()) {
+                if (hits == null) {
+                    hits = StructureLookup.at(level, pos);
+                }
+                StructureLookup.Hit matched = matchStructure(region, hits);
+                if (matched == null) {
+                    ok = false;
+                } else {
+                    tier = TIER_STRUCTURE;
+                    structureName = DangerAnalyzer.prettify(matched.id().getPath());
+                }
+            }
             if (!ok || tier == 0) continue;
 
             if (tier == TIER_DIMENSION) {
@@ -141,16 +247,24 @@ public class LocationMatcher {
             return best;
         }
 
-        if (config.isSmartAutoEnabled()) {
+        if (smartAuto(config)) {
+            if (hits == null) {
+                hits = (config.hasStructureRegions() || config.getSmartAutoSettings().analyzeStructures())
+                        ? StructureLookup.at(level, pos)
+                        : Collections.emptyList();
+            }
 
             int spawners = DangerAnalyzer.countSpawners(level, pos);
 
             DangerAnalyzer.DangerResult dimension = DangerAnalyzer.analyzeDimension(level);
-            DangerAnalyzer.DangerResult structureDanger = DangerAnalyzer.analyzeStructure(hits);
 
+            // hostile mobs around: only when the option is on, and not when a structure already gives the top level
             int enemies = 0;
-            if (!structureDanger.isDangerous || structureDanger.difficultyLevel < 5) {
-                enemies = DangerAnalyzer.countEnemies(level, pos);
+            if (config.getSmartAutoSettings().analyzeEnemies()) {
+                DangerAnalyzer.DangerResult structureDanger = DangerAnalyzer.analyzeStructure(hits);
+                if (!structureDanger.isDangerous || structureDanger.difficultyLevel < 5) {
+                    enemies = DangerAnalyzer.countEnemies(level, pos);
+                }
             }
 
             DangerAnalyzer.DangerResult danger = DangerAnalyzer.analyze(hits, biome, spawners, dimension,
@@ -237,22 +351,22 @@ public class LocationMatcher {
     }
 
     public static int getDifficultyLevel(Level level, BlockPos pos) {
-        Match m = match(level, pos);
+        Match m = matchCheap(level, pos);
         return m != null ? m.region().getDifficultyLevel() : 1;
     }
 
     public static String getRegionName(Level level, BlockPos pos) {
-        Match m = match(level, pos);
+        Match m = matchCheap(level, pos);
         return m != null ? m.region().getRegionName() : "";
     }
 
     public static String getDifficultyTitle(Level level, BlockPos pos) {
-        Match m = match(level, pos);
+        Match m = matchCheap(level, pos);
         return m != null ? m.region().getDifficultyTitle() : "";
     }
 
     public static String getStructureName(Level level, BlockPos pos) {
-        Match m = match(level, pos);
+        Match m = matchCheap(level, pos);
         return m != null ? m.structureName() : "";
     }
 }

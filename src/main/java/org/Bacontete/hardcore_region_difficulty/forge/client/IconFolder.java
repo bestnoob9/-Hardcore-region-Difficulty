@@ -29,6 +29,10 @@ public final class IconFolder {
 
     private static final Map<String, Long> LOADED = new HashMap<>();
     private static final Map<String, Boolean> OK = new HashMap<>();
+    /** ensure() runs every frame while a title is shown: the file / resource is checked at most once per second. */
+    private static final long RECHECK_MS = 1000L;
+    private static final Map<ResourceLocation, Long> CHECKED_AT = new HashMap<>();
+    private static final Map<ResourceLocation, Boolean> CHECKED_RESULT = new HashMap<>();
 
     private IconFolder() {}
 
@@ -84,6 +88,22 @@ public final class IconFolder {
         if (tex == null) {
             return false;
         }
+        long now = System.currentTimeMillis();
+        Long at = CHECKED_AT.get(tex);
+        if (at != null && now - at < RECHECK_MS && now >= at) {
+            return CHECKED_RESULT.getOrDefault(tex, false);
+        }
+        boolean result = check(tex);
+        if (CHECKED_AT.size() > 64) {
+            CHECKED_AT.clear();
+            CHECKED_RESULT.clear();
+        }
+        CHECKED_AT.put(tex, now);
+        CHECKED_RESULT.put(tex, result);
+        return result;
+    }
+
+    private static boolean check(ResourceLocation tex) {
         Minecraft mc = Minecraft.getInstance();
         if (!NAMESPACE.equals(tex.getNamespace())) {
             return mc.getResourceManager().getResource(tex).isPresent();

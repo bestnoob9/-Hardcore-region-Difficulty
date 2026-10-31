@@ -89,6 +89,8 @@ import java.util.concurrent.CompletableFuture;
 public class HardcoreRegionDifficultyForge {
 
     private static final int REGION_CHECK_INTERVAL = 20;
+    /** Cheap biome-only check (no structure/danger scan): a biome change is sent within this many ticks. */
+    private static final int BIOME_CHECK_INTERVAL = 1;
 
     private static final int CONFIG_CHECK_INTERVAL = 100;
     private int configCheckTicks = 0;
@@ -139,7 +141,7 @@ public class HardcoreRegionDifficultyForge {
         if (event.getLevel().isClientSide()) {
             return;
         }
-        if (event.getEntity() instanceof Mob mob && EntityScaler.shouldScale(mob)) {
+        if (event.getEntity() instanceof Mob mob && !EntityScaler.isScaled(mob) && EntityScaler.shouldScale(mob)) {
             EntityScaler.applyScaling(mob);
         }
     }
@@ -159,7 +161,11 @@ public class HardcoreRegionDifficultyForge {
         if (event.phase != TickEvent.Phase.END || event.side != LogicalSide.SERVER) {
             return;
         }
-        if (!(event.player instanceof ServerPlayer player) || player.tickCount % REGION_CHECK_INTERVAL != 0) {
+        if (!(event.player instanceof ServerPlayer player)) {
+            return;
+        }
+        boolean fullCheck = player.tickCount % REGION_CHECK_INTERVAL == 0;
+        if (!fullCheck && (player.tickCount % BIOME_CHECK_INTERVAL != 0 || !PlayerRegionTracker.biomeChanged(player))) {
             return;
         }
         if (PlayerRegionTracker.updateAndCheckChange(player)) {
@@ -167,11 +173,14 @@ public class HardcoreRegionDifficultyForge {
             if (info != null && !info.regionName.isEmpty()) {
                 NetworkHandler.sendToPlayer(player,
                         new TitleDisplayPacket(info.regionName, info.difficultyTitle, info.structureName, info.difficultyLevel,
-                                info.icon, DifficultyIcons.parseColorRgb(info.titleColor)));
+                                info.icon, DifficultyIcons.parseColorRgb(info.titleColor),
+                                PlayerRegionTracker.wasLegacyAnnounce(player)));
             }
         }
 
-        BossProximityWarning.checkForNearbyBosses(player);
+        if (fullCheck) {
+            BossProximityWarning.checkForNearbyBosses(player);
+        }
     }
 
     @SubscribeEvent

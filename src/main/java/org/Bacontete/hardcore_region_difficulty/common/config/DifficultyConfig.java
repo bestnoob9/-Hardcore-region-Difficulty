@@ -253,6 +253,46 @@ public class DifficultyConfig {
         return loadConfig();
     }
 
+    /**
+     * Writes smart_auto_settings.analyze_enemies, enemy_scan_radius and enemy_level_thresholds into the config file
+     * (everything else in the file is kept) and reloads it. Used by the Cloth Config screen.
+     * Returns false if the file could not be read or written.
+     */
+    public synchronized boolean setEnemySettings(boolean analyze, int radius, Map<Integer, Integer> thresholds) {
+        if (!configFile.exists()) {
+            writeDefaultConfig();
+        }
+        JsonObject root;
+        try (Reader reader = Files.newBufferedReader(configFile.toPath(), StandardCharsets.UTF_8)) {
+            JsonElement element = GSON.fromJson(reader, JsonElement.class);
+            if (element == null || !element.isJsonObject()) {
+                HardcoreRegionDifficulty.LOGGER.error("Config root must be a JSON object, not changing {}", configFile);
+                return false;
+            }
+            root = element.getAsJsonObject();
+        } catch (Exception e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not read {} to change smart_auto_settings", configFile, e);
+            return false;
+        }
+        JsonObject smart = root.has("smart_auto_settings") && root.get("smart_auto_settings").isJsonObject()
+                ? root.getAsJsonObject("smart_auto_settings") : new JsonObject();
+        smart.addProperty("analyze_enemies", analyze);
+        smart.addProperty("enemy_scan_radius", radius);
+        JsonObject levels = new JsonObject();
+        for (Map.Entry<Integer, Integer> e : new java.util.TreeMap<>(thresholds).entrySet()) {
+            levels.addProperty(String.valueOf(e.getKey()), e.getValue());
+        }
+        smart.add("enemy_level_thresholds", levels);
+        root.add("smart_auto_settings", smart);
+        try (Writer writer = Files.newBufferedWriter(configFile.toPath(), StandardCharsets.UTF_8)) {
+            WRITE_GSON.toJson(root, writer);
+        } catch (IOException e) {
+            HardcoreRegionDifficulty.LOGGER.error("Could not write {}", configFile, e);
+            return false;
+        }
+        return loadConfig();
+    }
+
     /** Custom level definitions of the file, by level. */
     public Map<Integer, DifficultyLevelDef> getLevelDefs() { return levelDefs; }
 

@@ -14,6 +14,7 @@ import net.minecraftforge.fml.common.Mod;
 import org.Bacontete.hardcore_region_difficulty.common.HardcoreRegionDifficulty;
 import org.Bacontete.hardcore_region_difficulty.common.client.TitleDisplayHandler;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyIcons;
+import org.Bacontete.hardcore_region_difficulty.forge.compat.TravelersTitlesCompat;
 
 @Mod.EventBusSubscriber(modid = HardcoreRegionDifficulty.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class RegionTitleOverlay {
@@ -28,6 +29,11 @@ public final class RegionTitleOverlay {
     }
 
     private static void render(ForgeGui gui, GuiGraphics graphics, float partialTick, int width, int height) {
+        // Traveler's Titles installed: its title is shown, HRD only adds the difficulty line under it.
+        // Boss titles are not region titles: they are still drawn by HRD below (TitleDisplayHandler.current()).
+        if (TravelersTitlesCompat.isIntegrated()) {
+            TravelersTitlesCompat.render(graphics, partialTick, width, height);
+        }
         TitleDisplayHandler.Active active = TitleDisplayHandler.current();
         Minecraft minecraft = Minecraft.getInstance();
         if (active == null || minecraft.options.hideGui) {
@@ -73,25 +79,40 @@ public final class RegionTitleOverlay {
         pose.popPose();
 
         y += font.lineHeight * nameScale + 2f;
+        drawDifficultyLine(graphics, font, active.subtitle(), active.icon(), active.skullIcon(), active.color(),
+                centerX, y, subScale, alpha);
+
+        RenderSystem.disableBlend();
+    }
+
+    /**
+     * Draws "[skull] difficulty title" centered on centerX, top at y. Shared by the normal HRD title and by the
+     * Traveler's Titles integration.
+     */
+    public static void drawDifficultyLine(GuiGraphics graphics, Font font, String subtitle, String icon, String skullIcon,
+                                          int color, float centerX, float y, float scale, float alpha) {
+        int a = (int) (Math.max(0f, Math.min(1f, alpha)) * 255f);
+        PoseStack pose = graphics.pose();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         pose.pushPose();
         pose.translate(centerX, y, 0f);
-        pose.scale(subScale, subScale, 1f);
+        pose.scale(scale, scale, 1f);
 
-        int textWidth = font.width(active.subtitle());
+        int textWidth = font.width(subtitle);
         int totalWidth = SKULL_SIZE + SKULL_GAP + textWidth;
         int left = -totalWidth / 2;
         RenderSystem.setShaderColor(1f, 1f, 1f, alpha);
-        ResourceLocation custom = DifficultyIcons.texture(active.icon());
+        ResourceLocation custom = DifficultyIcons.texture(icon);
         ResourceLocation iconTexture = custom != null && IconFolder.ensure(custom)
-                ? custom : DifficultyIcons.texture(active.skullIcon());
+                ? custom : DifficultyIcons.texture(skullIcon);
         // UV size 1/1 of a 1x1 "texture" = the whole image, so any square size works (12x12 built-in, 32x32, 64x64 ...)
         graphics.blit(iconTexture, left, -3, SKULL_SIZE, SKULL_SIZE,
                 0f, 0f, 1, 1, 1, 1);
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-        graphics.drawString(font, active.subtitle(), left + SKULL_SIZE + SKULL_GAP, 1,
-                (a << 24) | (active.color() >= 0 ? active.color() : 0xBBBBBB), true);
+        graphics.drawString(font, subtitle, left + SKULL_SIZE + SKULL_GAP, 1,
+                (a << 24) | (color >= 0 ? color : 0xBBBBBB), true);
         pose.popPose();
-
         RenderSystem.disableBlend();
     }
 }

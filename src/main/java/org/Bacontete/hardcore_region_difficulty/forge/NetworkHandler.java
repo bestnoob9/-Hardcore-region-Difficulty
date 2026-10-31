@@ -73,7 +73,8 @@ public class NetworkHandler {
 
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () ->
                 TitleDisplayHandler.displayTitle(packet.getRegionName(), packet.getDifficultyTitle(),
-                        packet.getStructureName(), packet.getDifficultyLevel(), packet.getIcon(), packet.getTitleColor()));
+                        packet.getStructureName(), packet.getDifficultyLevel(), packet.getIcon(), packet.getTitleColor(),
+                        packet.isLegacyAnnounce()));
         context.get().setPacketHandled(true);
     }
 

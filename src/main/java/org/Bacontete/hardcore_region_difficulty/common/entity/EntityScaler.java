@@ -81,7 +81,7 @@ public class EntityScaler {
         int regionLevel = raidLevel;
         DifficultyRegion region = null;
         if (raidLevel <= 0) {
-            LocationMatcher.Match match = LocationMatcher.match(mob.level(), mob.blockPosition());
+            LocationMatcher.Match match = LocationMatcher.matchCheap(mob.level(), mob.blockPosition());
             region = match != null ? match.region() : null;
             regionLevel = match != null ? match.region().getDifficultyLevel() : 1;
             if (match != null && !match.region().getEntityWhitelist().isEmpty()
@@ -282,14 +282,8 @@ public class EntityScaler {
                 }
             }
         }
-        if (scaling != null) {
-            for (MobEntry e : scaling.getWhitelistEntries()) {
-                if (e.hasDetails() && PatternMatcher.matchesSingle(e.getPattern(), id, tagTest)) {
-                    return e;
-                }
-            }
-        }
-        return null;
+        // the global entries only depend on the mob type: cached per type
+        return scaling != null ? MobTypeCache.get(mob).globalEntry() : null;
     }
 
     private static void removeModifiers(Mob mob) {
@@ -353,10 +347,12 @@ public class EntityScaler {
         if (scaling == null || scaling.getExcludePatterns().isEmpty()) {
             return false;
         }
-        EntityType<?> type = mob.getType();
-        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
-        return PatternMatcher.matches(scaling.getExcludePatterns(), id,
-                tag -> type.is(TagKey.create(Registries.ENTITY_TYPE, tag)));
+        return MobTypeCache.get(mob).excluded();
+    }
+
+    /** True when the mob already got its level (a mob loaded from the world keeps it), so joining again does nothing. */
+    public static boolean isScaled(Mob mob) {
+        return mob.getPersistentData().getBoolean(SCALED_TAG);
     }
 
     public static boolean shouldScale(Mob mob) {
@@ -384,7 +380,7 @@ public class EntityScaler {
             return false;
         }
 
-        if (!scaling.getWhitelistPatterns().isEmpty() && !matchesPatterns(mob, scaling.getWhitelistPatterns())) {
+        if (!MobTypeCache.get(mob).whitelistOk()) {
             return false;
         }
 

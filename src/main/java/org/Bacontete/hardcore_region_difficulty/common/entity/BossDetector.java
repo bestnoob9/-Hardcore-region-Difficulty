@@ -44,15 +44,18 @@ public class BossDetector {
 
     /** Boss class of the mob, or null if the mob is not a boss (or is excluded). */
     public static BossLevel getBossLevel(Mob mob) {
-        if (mob == null || EntityScaler.isExcluded(mob)) return null;   
+        if (mob == null) return null;
+        // exclude patterns and tags only depend on the mob type (cached per type)
+        MobTypeCache.Info info = MobTypeCache.get(mob);
+        if (info.excluded()) return null;
 
-        if (mob.getType().is(MINI_BOSS_TAG)) return BossLevel.MINI_BOSS;
-        if (mob.getType().is(BOSS_TAG)) return BossLevel.BOSS;
+        if (info.miniBossTag()) return BossLevel.MINI_BOSS;
+        if (info.bossTag()) return BossLevel.BOSS;
 
         if (isBoss(mob)) return BossLevel.BOSS;
         if (isMiniBoss(mob)) return BossLevel.MINI_BOSS;
 
-        if (mob.getType().is(FORGE_BOSSES_TAG)) return BossLevel.MINI_BOSS;
+        if (info.forgeBossesTag()) return BossLevel.MINI_BOSS;
         return null;
     }
 

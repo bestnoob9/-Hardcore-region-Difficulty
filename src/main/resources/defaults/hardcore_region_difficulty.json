@@ -238,6 +238,15 @@
       "4": 5,
       "5": 8
     },
+    "_analyze_enemies_warning": "Off by default. true = the number of hostile mobs around (enemy_scan_radius, max 128) also raises the level, like in version 1.0.5. WARNING: the mobs around are counted for every player each second and for mobs, loot and trades, so the server gets more lag, more with a bigger radius or many mobs.",
+    "analyze_enemies": false,
+    "enemy_scan_radius": 32,
+    "enemy_level_thresholds": {
+      "2": 5,
+      "3": 10,
+      "4": 15,
+      "5": 20
+    },
     "structure_levels": {},
     "biome_levels": {},
     "analyze_dimensions": true,

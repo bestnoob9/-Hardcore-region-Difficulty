@@ -16,6 +16,7 @@
 - Hostile mobs get more health, damage, armor and speed as the level rises. Growth slows down at high levels so things never spiral out of control.
 - Raids always run at Difficulty III by default, for every raider, vanilla or modded. You can change that level or turn it off.
 - On-screen titles tell you how dangerous an area is when you walk into it, and you get a warning when a boss is close.
+- Works with **Traveler's Titles** (optional): biome titles come from it and the difficulty appears right under, fading out together; structure titles from HRD are shown in its style.
 - Everything is flexible: you can match mobs, biomes and structures by exact name, by tag, by pattern, with wildcards, or exclude them.
 
 ### 👑 Bosses and Mini Bosses
@@ -46,7 +47,7 @@ Ten enchantments that go well past vanilla limits: Advanced Protection, Sharpnes
 - The higher the region level, the higher the enchantment levels you can find.
 - You can turn them off if you feel they are too strong for your world.
 
-### 🌌 Optional Compat: Deeper and Darker × Cataclysm
+### 🌌 Optional Compat: Deeper and Darker × Cataclysm, Traveler's Titles Compat
 Turn on the compat option in the config to link two of the hardest mods:
 - Cataclysm's Ignitium and Cursium armor are crafted from Deeper and Darker Warden gear instead of Netherite.
 - Needs both Deeper and Darker and L_Ender's Cataclysm when the option is on.

@@ -8,6 +8,7 @@ import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.TitleDisplaySettings;
 import org.Bacontete.hardcore_region_difficulty.common.entity.BossLevel;
 import org.Bacontete.hardcore_region_difficulty.forge.ClientConfig;
+import org.Bacontete.hardcore_region_difficulty.forge.compat.TravelersTitlesCompat;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -93,11 +94,23 @@ public class TitleDisplayHandler {
     }
 
     public static void displayTitle(String regionName, String difficultyTitle, String structureName, int difficultyLevel) {
-        displayTitle(regionName, difficultyTitle, structureName, difficultyLevel, "", -1);
+        displayTitle(regionName, difficultyTitle, structureName, difficultyLevel, "", -1, true);
     }
 
     public static void displayTitle(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
                                     String icon, int titleColor) {
+        displayTitle(regionName, difficultyTitle, structureName, difficultyLevel, icon, titleColor, true);
+    }
+
+    /**
+     * @param legacyAnnounce whether HRD's own old title rules would announce this. Without Traveler's Titles a packet
+     *                       where this is false is ignored completely, so HRD behaves exactly as before.
+     */
+    public static void displayTitle(String regionName, String difficultyTitle, String structureName, int difficultyLevel,
+                                    String icon, int titleColor, boolean legacyAnnounce) {
+        if (!legacyAnnounce && !TravelersTitlesCompat.isIntegrated()) {
+            return;
+        }
         String incomingStructure = structureName == null ? "" : structureName;
         boolean leftStructure = !lastPacketStructure.isEmpty() && incomingStructure.isEmpty();
         lastPacketStructure = incomingStructure;
@@ -109,7 +122,12 @@ public class TitleDisplayHandler {
             config.loadConfig(); 
         }
         TitleDisplaySettings settings = config != null ? config.getTitleDisplaySettings() : new TitleDisplaySettings();
-        if (settings == null || !settings.isEnabled() || !ClientConfig.SHOW_REGION_TITLE.get()) {
+        // With Traveler's Titles the region title cannot be switched off here: only its title is shown and HRD adds the difficulty line
+        boolean travelersTitles = TravelersTitlesCompat.isIntegrated();
+        if (settings == null) {
+            settings = new TitleDisplaySettings();
+        }
+        if (!travelersTitles && (!settings.isEnabled() || !ClientConfig.SHOW_REGION_TITLE.get())) {
             return;
         }
 
@@ -124,7 +142,8 @@ public class TitleDisplayHandler {
         String key = regionName + "|" + structureName + "|" + difficultyLevel;
         int cooldown = settings.getRepeatCooldownSeconds();
         Long last = LAST_SHOWN.get(key);
-        if (!leftStructure && !levelChanged && incomingStructure.isEmpty() && cooldown > 0 && last != null
+        // with Traveler's Titles the cooldown is Traveler's Titles' own: if it stays silent the difficulty line is dropped
+        if (!travelersTitles && !leftStructure && !levelChanged && incomingStructure.isEmpty() && cooldown > 0 && last != null
                 && now - last < cooldown * 1000L) {
             return;
         }
@@ -135,6 +154,13 @@ public class TitleDisplayHandler {
 
         int tier = skullTier(difficultyLevel);
         String subtitleText = difficultyTitle == null ? "" : difficultyTitle;
+
+        if (travelersTitles) {
+            // biome: the Traveler's Titles title + HRD difficulty line under it.
+            // structure: HRD's structure name is shown through the Traveler's Titles renderer + difficulty line under it
+            TravelersTitlesCompat.show(incomingStructure.isEmpty() ? null : regionName, subtitleText, skullIcon(tier), icon, titleColor);
+            return;
+        }
 
         if (settings.isVanillaStyle()) {
             minecraft.gui.setTimes(settings.getFadeInTicks(), settings.getStayTicks(), settings.getFadeOutTicks());

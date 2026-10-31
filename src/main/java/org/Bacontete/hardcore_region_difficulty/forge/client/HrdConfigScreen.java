@@ -3,12 +3,18 @@ package org.Bacontete.hardcore_region_difficulty.forge.client;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import me.shedaniel.clothconfig2.api.Requirement;
+import me.shedaniel.clothconfig2.gui.entries.BooleanListEntry;
+import me.shedaniel.clothconfig2.impl.builders.SubCategoryBuilder;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
+import org.Bacontete.hardcore_region_difficulty.common.config.SmartAutoSettings;
 import org.Bacontete.hardcore_region_difficulty.forge.compat.DeeperDarkerCataclysmCompat;
+import org.Bacontete.hardcore_region_difficulty.forge.compat.TravelersTitlesCompat;
 
+import java.util.Map;
 import java.util.Optional;
 import org.Bacontete.hardcore_region_difficulty.common.quality.QualityConfig;
 import org.Bacontete.hardcore_region_difficulty.forge.ClientConfig;
@@ -69,11 +75,22 @@ public final class HrdConfigScreen {
                 .setSaveConsumer(ForgeConfig.ENABLED::set)
                 .build());
         general.addEntry(entries.startTextDescription(t("difficulty_warning").copy().withStyle(ChatFormatting.RED)).build());
-        general.addEntry(entries.startBooleanToggle(t("show_region_title"), ClientConfig.SHOW_REGION_TITLE.get())
+        // Traveler's Titles installed: its title is used and the difficulty line is always shown, so this switch is greyed out
+        final boolean travelersTitles = TravelersTitlesCompat.isActive();
+        var regionTitleEntry = entries.startBooleanToggle(t("show_region_title"),
+                        travelersTitles || ClientConfig.SHOW_REGION_TITLE.get())
                 .setDefaultValue(true)
-                .setTooltip(TooltipWrap.wrap(t("show_region_title.tooltip")))
-                .setSaveConsumer(ClientConfig.SHOW_REGION_TITLE::set)
-                .build());
+                .setTooltip(TooltipWrap.wrap(t(travelersTitles ? "show_region_title.travelerstitles" : "show_region_title.tooltip")))
+                .setSaveConsumer(value -> {
+                    if (!travelersTitles) {
+                        ClientConfig.SHOW_REGION_TITLE.set(value);
+                    }
+                })
+                .build();
+        if (travelersTitles) {
+            regionTitleEntry.setEditable(false);
+        }
+        general.addEntry(regionTitleEntry);
         general.addEntry(entries.startBooleanToggle(t("show_boss_title"), ClientConfig.SHOW_BOSS_TITLE.get())
                 .setDefaultValue(true)
                 .setTooltip(TooltipWrap.wrap(t("show_boss_title.tooltip")))
@@ -95,6 +112,80 @@ public final class HrdConfigScreen {
                     }
                 })
                 .build());
+
+        // Stored in hardcore_region_difficulty.json (smart_auto_settings): counting the hostile mobs around costs TPS.
+        // The radius and the level thresholds only show while the switch is on; enemySave writes all of them at once.
+        final SmartAutoSettings smartSettings = difficultyConfig != null ? difficultyConfig.getSmartAutoSettings() : null;
+        final boolean currentEnemies = smartSettings != null && smartSettings.analyzeEnemies();
+        final int currentRadius = smartSettings != null
+                ? smartSettings.enemyScanRadius() : SmartAutoSettings.DEFAULT_ENEMY_SCAN_RADIUS;
+        final java.util.TreeMap<Integer, Integer> currentThresholds = new java.util.TreeMap<>(smartSettings != null
+                ? smartSettings.enemyLevelThresholds() : SmartAutoSettings.DEFAULT_ENEMY_THRESHOLDS);
+        final boolean[] enemiesOn = {currentEnemies};
+        final int[] enemyRadius = {currentRadius};
+        final int[] newEnemyLevel = {0};   // "add a level": level number (0 = nothing to add)
+        final int[] newEnemyCount = {0};   // "add a level": minimum hostile mobs of that level
+        final java.util.TreeMap<Integer, Integer> enemyThresholds = new java.util.TreeMap<>(currentThresholds);
+
+        BooleanListEntry enemyToggle = entries.startBooleanToggle(t("analyze_enemies"), currentEnemies)
+                .setDefaultValue(false)
+                .setTooltip(TooltipWrap.wrap(t("analyze_enemies.tooltip"),
+                        t("analyze_enemies.warning").copy().withStyle(ChatFormatting.RED)))
+                .setSaveConsumer(value -> enemiesOn[0] = value)
+                .build();
+        general.addEntry(enemyToggle);
+        general.addEntry(entries.startTextDescription(t("analyze_enemies.warning").copy().withStyle(ChatFormatting.RED)).build());
+
+        SubCategoryBuilder enemyOptions = entries.startSubCategory(t("enemy_options"))
+                .setExpanded(true)
+                .setDisplayRequirement(Requirement.isTrue(enemyToggle));
+        enemyOptions.add(entries.startIntField(t("enemy_radius"), currentRadius)
+                .setDefaultValue(SmartAutoSettings.DEFAULT_ENEMY_SCAN_RADIUS)
+                .setMin(1)
+                .setMax(SmartAutoSettings.MAX_ENEMY_SCAN_RADIUS)
+                .setTooltip(TooltipWrap.wrap(t("enemy_radius.tooltip")))
+                .setSaveConsumer(value -> enemyRadius[0] = value)
+                .build());
+        for (Map.Entry<Integer, Integer> threshold : currentThresholds.entrySet()) {
+            final int level = threshold.getKey();
+            enemyOptions.add(entries.startIntField(Component.translatable(K + "enemy_threshold", level), threshold.getValue())
+                    .setDefaultValue(SmartAutoSettings.DEFAULT_ENEMY_THRESHOLDS.getOrDefault(level, threshold.getValue()))
+                    .setMin(0)   // 0 removes the level from the table
+                    .setTooltip(TooltipWrap.wrap(t("enemy_threshold.tooltip")))
+                    .setSaveConsumer(value -> {
+                        if (value <= 0) {
+                            enemyThresholds.remove(level);
+                        } else {
+                            enemyThresholds.put(level, value);
+                        }
+                    })
+                    .build());
+        }
+        // add a new level to the table (level 1 is the base level and has no threshold)
+        enemyOptions.add(entries.startIntField(t("enemy_new_level"), 0)
+                .setDefaultValue(0)
+                .setMin(0)
+                .setMax(100)
+                .setErrorSupplier(value -> value == 1 ? Optional.of(t("enemy_new_level.error")) : Optional.empty())
+                .setTooltip(TooltipWrap.wrap(t("enemy_new_level.tooltip")))
+                .setSaveConsumer(value -> newEnemyLevel[0] = value)
+                .build());
+        enemyOptions.add(entries.startIntField(t("enemy_new_count"), 0)
+                .setDefaultValue(0)
+                .setMin(0)
+                .setTooltip(TooltipWrap.wrap(t("enemy_new_count.tooltip")))
+                .setSaveConsumer(value -> newEnemyCount[0] = value)
+                .build());
+        general.addEntry(enemyOptions.build());
+        final Runnable enemySave = () -> {
+            if (newEnemyLevel[0] >= 2 && newEnemyCount[0] >= 1) {
+                enemyThresholds.put(newEnemyLevel[0], newEnemyCount[0]);
+            }
+            if (difficultyConfig != null && (enemiesOn[0] != currentEnemies || enemyRadius[0] != currentRadius
+                    || !enemyThresholds.equals(currentThresholds))) {
+                difficultyConfig.setEnemySettings(enemiesOn[0], enemyRadius[0], enemyThresholds);
+            }
+        };
 
         // ---- Difficulty: regions and levels (edits hardcore_region_difficulty.json) ----
         Runnable regionEditorSave = RegionEditorTabs.add(entries, difficulty);
@@ -217,6 +308,7 @@ public final class HrdConfigScreen {
         }
 
         builder.setSavingRunnable(() -> {
+            enemySave.run(); // first: the later savers re-read the file and keep what is in it
             ClientConfig.SPEC.save();
             QualityConfig.SPEC.save();
             ForgeConfig.SPEC.save();
