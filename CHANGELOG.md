@@ -4,7 +4,7 @@
 
 ## Change 
 
-- TPS Optimization 
+- **Rainfall Serenity (Celestisynth: Wishes and Hells mod):** now have reforge quailty.
 
 ## Update 1.0.6
 
