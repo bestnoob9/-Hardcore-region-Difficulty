@@ -1,5 +1,11 @@
 # Changelog
 
+## Update 1.0.7
+
+## Change 
+
+- TPS Optimization 
+
 ## Update 1.0.6
 
 ## Added

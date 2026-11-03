@@ -31,7 +31,19 @@ public final class ForgeMaterials {
         if (tool.getItem().isValidRepairItem(tool, material)) {
             return true;
         }
+        if (isCelestisynthMaterial(toolId, materialId)) {
+            return true;
+        }
         return isRecipeIngredient(tool.getItem(), material, level);
+    }
+
+    /**
+     * Celestisynth weapons
+     */
+    private static boolean isCelestisynthMaterial(ResourceLocation toolId, ResourceLocation materialId) {
+        return "celestisynth".equals(toolId.getNamespace())
+                && "celestisynth".equals(materialId.getNamespace())
+                && "celestial_core_heated".equals(materialId.getPath());
     }
 
     private static boolean isRecipeIngredient(Item toolItem, ItemStack material, Level level) {
