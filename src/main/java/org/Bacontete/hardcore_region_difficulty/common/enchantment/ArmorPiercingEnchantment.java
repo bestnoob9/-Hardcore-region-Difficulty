@@ -18,7 +18,12 @@ public class ArmorPiercingEnchantment extends Enchantment {
 
     public static float ignoredFraction(int level) {
         if (level <= 0) return 0.0F;
-        return Math.min(level, MAX_LEVEL) * 0.1F;
+        // level 1 = 15%, level 2 = 30%, level 3 = 60% of the armor and toughness ignored
+        return switch (Math.min(level, MAX_LEVEL)) {
+            case 1 -> 0.15F;
+            case 2 -> 0.30F;
+            default -> 0.60F;
+        };
     }
 
     private static boolean fitsItem(ItemStack stack) {

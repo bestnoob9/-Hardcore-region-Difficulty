@@ -14,7 +14,6 @@ import net.minecraft.network.chat.MutableComponent;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyIcons;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyPreset;
-import org.Bacontete.hardcore_region_difficulty.common.config.PresetStore;
 import org.Bacontete.hardcore_region_difficulty.common.config.LootSettings;
 import org.Bacontete.hardcore_region_difficulty.common.config.ScalingSettings;
 import org.Bacontete.hardcore_region_difficulty.common.elite.EliteAffix;
@@ -75,6 +74,8 @@ public final class RegionEditorTabs {
 
     /** Default step of the formula (scaling_settings). */
     private static final class ScalingModel {
+        /** The fields the preset panel reads and fills. */
+        PresetBinding binding;
         boolean linear;
         double health;
         double damage;
@@ -171,9 +172,10 @@ public final class RegionEditorTabs {
 
     /**
      * Adds the "regions" and "levels" groups to the given tab.
+     * @param presetBinding collects the fields a preset covers (also the boss fields of the whitelist tab are added to it)
      * @return the runnable to call from the screen's saving runnable (writes the file)
      */
-    public static Runnable add(ConfigEntryBuilder entries, ConfigCategory tab) {
+    public static Runnable add(ConfigEntryBuilder entries, ConfigCategory tab, PresetBinding presetBinding) {
         Minecraft mc = Minecraft.getInstance();
         boolean editable = mc.level == null || mc.getSingleplayerServer() != null;
         DifficultyConfig cfg = DifficultyConfig.getInstance();
@@ -231,6 +233,7 @@ public final class RegionEditorTabs {
         // default step of the formula, shared by every level without custom stats
         ScalingSettings sc = cfg.getScalingSettings();
         ScalingModel scaling = new ScalingModel();
+        scaling.binding = presetBinding;
         scaling.linear = sc.isLinear();
         scaling.health = sc.getHealthPercent();
         scaling.damage = sc.getDamagePercent();
@@ -291,11 +294,11 @@ public final class RegionEditorTabs {
                 .setTooltip(TooltipWrap.wrap(t("scaling.linear.tooltip")))
                 .setSaveConsumer(v -> scaling.linear = v)
                 .build());
-        scalingSub.add(percentField("scaling.health", scaling.health, ScalingSettings.DEFAULT_HEALTH_PERCENT, v -> scaling.health = v));
-        scalingSub.add(percentField("scaling.damage", scaling.damage, ScalingSettings.DEFAULT_DAMAGE_PERCENT, v -> scaling.damage = v));
-        scalingSub.add(percentField("scaling.armor", scaling.armor, ScalingSettings.DEFAULT_ARMOR_PERCENT, v -> scaling.armor = v));
-        scalingSub.add(percentField("scaling.speed", scaling.speed, ScalingSettings.DEFAULT_SPEED_PERCENT, v -> scaling.speed = v));
-        scalingSub.add(percentField("scaling.armor_flat", scaling.armorFlat, ScalingSettings.DEFAULT_ARMOR_FLAT, v -> scaling.armorFlat = v));
+        scalingSub.add(presetBinding.bind(DifficultyPreset.HEALTH, percentField("scaling.health", scaling.health, ScalingSettings.DEFAULT_HEALTH_PERCENT, v -> scaling.health = v)));
+        scalingSub.add(presetBinding.bind(DifficultyPreset.DAMAGE, percentField("scaling.damage", scaling.damage, ScalingSettings.DEFAULT_DAMAGE_PERCENT, v -> scaling.damage = v)));
+        scalingSub.add(presetBinding.bind(DifficultyPreset.ARMOR, percentField("scaling.armor", scaling.armor, ScalingSettings.DEFAULT_ARMOR_PERCENT, v -> scaling.armor = v)));
+        scalingSub.add(presetBinding.bind(DifficultyPreset.SPEED, percentField("scaling.speed", scaling.speed, ScalingSettings.DEFAULT_SPEED_PERCENT, v -> scaling.speed = v)));
+        scalingSub.add(presetBinding.bind(DifficultyPreset.ARMOR_FLAT, percentField("scaling.armor_flat", scaling.armorFlat, ScalingSettings.DEFAULT_ARMOR_FLAT, v -> scaling.armorFlat = v)));
         // soft cap: from this level on the % bonus grows more slowly (0 = off)
         scalingSub.add(entries.startIntField(t("scaling.soft_cap"), scaling.softCap)
                 .setDefaultValue(ScalingSettings.DEFAULT_SOFT_CAP_LEVEL)
@@ -422,41 +425,8 @@ public final class RegionEditorTabs {
         lootSub.add(entries.startDoubleField(t("loot.mob_enchant"), scaling.lootMobEnchant).setDefaultValue(2).setMin(0).setMax(100)
                 .setSaveConsumer(v -> scaling.lootMobEnchant = v).build());
         levelsGroup.add(lootSub.build());
-        // ---- presets: built-in (easy / normal / hardcore) + the player's own; applied on save when changed ----
-        final java.io.File presetDir = cfg.getConfigDirectory();
-        final List<DifficultyPreset> allPresets = new ArrayList<>(DifficultyPreset.builtIns());
-        allPresets.addAll(PresetStore.load(presetDir));
-        final String customLabel = t("preset.custom").getString();
-        java.util.function.Function<DifficultyPreset, String> presetLabel =
-                p -> p.builtIn ? t("preset." + p.id).getString() : p.id;
-        List<String> presetLabels = new ArrayList<>();
-        for (DifficultyPreset p : allPresets) presetLabels.add(presetLabel.apply(p));
-        presetLabels.add(customLabel);
-        DifficultyPreset detected = DifficultyPreset.detect(allPresets, currentValues(scaling));
-        final String initialLabel = detected == null ? customLabel : presetLabel.apply(detected);
-        final String[] presetChoice = { initialLabel };
-        final String[] newPresetName = { "" };
-        final boolean[] deletePreset = { false };
-        tab.addEntry(entries.startDropdownMenu(t("preset"), initialLabel, str -> str.trim(), Component::literal)
-                .setSelections(presetLabels)
-                .setDefaultValue(presetLabel.apply(DifficultyPreset.NORMAL))
-                .setErrorSupplier(v -> presetLabels.contains(v) ? Optional.empty() : Optional.of(t("preset.invalid")))
-                .setTooltip(TooltipWrap.wrap(t("preset.tooltip")))
-                .setSaveConsumer(v -> presetChoice[0] = v)
-                .build());
-        SubCategoryBuilder ownPresets = entries.startSubCategory(t("preset.own")).setExpanded(false);
-        ownPresets.add(entries.startTextDescription(t("preset.own.note")).build());
-        ownPresets.add(entries.startStrField(t("preset.new_name"), "")
-                .setDefaultValue("")
-                .setTooltip(TooltipWrap.wrap(t("preset.new_name.tooltip")))
-                .setSaveConsumer(v -> newPresetName[0] = v.trim())
-                .build());
-        ownPresets.add(entries.startBooleanToggle(t("preset.delete"), false)
-                .setDefaultValue(false)
-                .setTooltip(TooltipWrap.wrap(t("preset.delete.tooltip")))
-                .setSaveConsumer(v -> deletePreset[0] = v)
-                .build());
-        tab.addEntry(ownPresets.build());
+        // ---- presets: a panel with buttons that work at once (choose, apply, save as new, delete) ----
+        tab.addEntry(new PresetPanelEntry(presetBinding, () -> currentValues(scaling), cfg.getConfigDirectory()));
         // type just the number: 0 = off, 1-5 and every level that exists in the config (also the ones you added, 6+)
         List<Integer> raidChoices = new ArrayList<>();
         raidChoices.add(0);
@@ -466,7 +436,7 @@ public final class RegionEditorTabs {
         }
         java.util.Collections.sort(raidChoices);
         final String raidValid = raidChoices.toString().replace("[", "").replace("]", "");
-        tab.addEntry(entries.startIntField(t("scaling.raid"), scaling.raidLevel)
+        tab.addEntry(presetBinding.bind(DifficultyPreset.RAID_LEVEL, entries.startIntField(t("scaling.raid"), scaling.raidLevel)
                 .setDefaultValue(ScalingSettings.DEFAULT_RAID_LEVEL)
                 .setMin(0)
                 .setMax(ScalingSettings.ABSOLUTE_MAX_LEVEL)
@@ -474,7 +444,7 @@ public final class RegionEditorTabs {
                         : java.util.Optional.of(Component.translatable(K + "scaling.raid.invalid", raidValid)))
                 .setTooltip(TooltipWrap.wrap(t("scaling.raid.tooltip")))
                 .setSaveConsumer(v -> scaling.raidLevel = v)
-                .build());
+                .build()));
         levelsGroup.add(scalingSub.build());
         for (LevelModel m : levelList) {
             MutableComponent title = Component.literal("Level " + m.level
@@ -510,46 +480,7 @@ public final class RegionEditorTabs {
         tab.addEntry(levelsGroup.build());
         return () -> {
             // the boss values were already stored by their own entries, the rest is in "scaling"
-            if (deletePreset[0]) {
-                final String sel = presetChoice[0];
-                allPresets.removeIf(p -> !p.builtIn && p.id.equals(sel));
-                PresetStore.save(presetDir, allPresets);
-            } else if (!newPresetName[0].isBlank()) {
-                final String name = newPresetName[0];
-                boolean reserved = false;
-                for (DifficultyPreset p : DifficultyPreset.builtIns()) {
-                    if (p.id.equalsIgnoreCase(name) || presetLabel.apply(p).equalsIgnoreCase(name)) reserved = true;
-                }
-                if (!reserved && !name.equalsIgnoreCase(customLabel)) {
-                    allPresets.removeIf(p -> !p.builtIn && p.id.equals(name));
-                    allPresets.add(new DifficultyPreset(name, false, currentValues(scaling)));
-                    PresetStore.save(presetDir, allPresets);
-                }
-            } else if (!presetChoice[0].equals(initialLabel) && !presetChoice[0].equals(customLabel)) {
-                for (DifficultyPreset p : allPresets) {
-                    if (!presetLabel.apply(p).equals(presetChoice[0])) continue;
-                    scaling.health = p.get(DifficultyPreset.HEALTH);
-                    scaling.damage = p.get(DifficultyPreset.DAMAGE);
-                    scaling.armor = p.get(DifficultyPreset.ARMOR);
-                    scaling.speed = p.get(DifficultyPreset.SPEED);
-                    scaling.armorFlat = p.get(DifficultyPreset.ARMOR_FLAT);
-                    scaling.miniBossHealth = p.get(DifficultyPreset.MINI_HEALTH);
-                    scaling.miniBossArmor = p.get(DifficultyPreset.MINI_ARMOR);
-                    scaling.miniBossDamage = p.get(DifficultyPreset.MINI_DAMAGE);
-                    scaling.bossHealth = p.get(DifficultyPreset.BOSS_HEALTH);
-                    scaling.bossArmor = p.get(DifficultyPreset.BOSS_ARMOR);
-                    scaling.bossDamage = p.get(DifficultyPreset.BOSS_DAMAGE);
-                    scaling.raidLevel = p.raid();
-                    ForgeConfig.DRAGON_HEALTH.set(p.get(DifficultyPreset.DRAGON_HEALTH));
-                    ForgeConfig.DRAGON_DAMAGE_MULTIPLIER.set(p.get(DifficultyPreset.DRAGON_DAMAGE));
-                    ForgeConfig.WITHER_HEALTH.set(p.get(DifficultyPreset.WITHER_HEALTH));
-                    ForgeConfig.WITHER_DAMAGE_MULTIPLIER.set(p.get(DifficultyPreset.WITHER_DAMAGE));
-                    ForgeConfig.WARDEN_HEALTH.set(p.get(DifficultyPreset.WARDEN_HEALTH));
-                    ForgeConfig.WARDEN_DAMAGE_MULTIPLIER.set(p.get(DifficultyPreset.WARDEN_DAMAGE));
-                    ForgeConfig.SPEC.save();
-                    break;
-                }
-            }
+            // (presets are not handled here any more: the panel writes them the moment you click)
             save(cfg, levelList, existingLevels, scaling);
         };
     }
@@ -629,18 +560,21 @@ public final class RegionEditorTabs {
             // boss classes: extra bonus on top of the bonus of the level of the region where the boss is
             boolean boss = bossClass == BossLevel.BOSS;
             sub.add(e.startTextDescription(t("level_editor.boss_stats.note")).build());
-            sub.add(bossField(e, "level_editor.boss_health",
+            sub.add(scaling.binding.bind(boss ? DifficultyPreset.BOSS_HEALTH : DifficultyPreset.MINI_HEALTH,
+                    bossField(e, "level_editor.boss_health",
                     boss ? scaling.bossHealth : scaling.miniBossHealth,
                     boss ? ScalingSettings.DEFAULT_BOSS_HEALTH_BONUS : ScalingSettings.DEFAULT_MINI_BOSS_HEALTH,
-                    v -> { if (boss) scaling.bossHealth = v; else scaling.miniBossHealth = v; }));
-            sub.add(bossField(e, "level_editor.boss_armor",
+                    v -> { if (boss) scaling.bossHealth = v; else scaling.miniBossHealth = v; })));
+            sub.add(scaling.binding.bind(boss ? DifficultyPreset.BOSS_ARMOR : DifficultyPreset.MINI_ARMOR,
+                    bossField(e, "level_editor.boss_armor",
                     boss ? scaling.bossArmor : scaling.miniBossArmor,
                     boss ? ScalingSettings.DEFAULT_BOSS_ARMOR : ScalingSettings.DEFAULT_MINI_BOSS_ARMOR,
-                    v -> { if (boss) scaling.bossArmor = v; else scaling.miniBossArmor = v; }));
-            sub.add(bossField(e, "level_editor.boss_damage",
+                    v -> { if (boss) scaling.bossArmor = v; else scaling.miniBossArmor = v; })));
+            sub.add(scaling.binding.bind(boss ? DifficultyPreset.BOSS_DAMAGE : DifficultyPreset.MINI_DAMAGE,
+                    bossField(e, "level_editor.boss_damage",
                     boss ? scaling.bossDamage : scaling.miniBossDamage,
                     boss ? ScalingSettings.DEFAULT_BOSS_DAMAGE : ScalingSettings.DEFAULT_MINI_BOSS_DAMAGE,
-                    v -> { if (boss) scaling.bossDamage = v; else scaling.miniBossDamage = v; }));
+                    v -> { if (boss) scaling.bossDamage = v; else scaling.miniBossDamage = v; })));
             // own multipliers: multiply the whole bonus of the boss (1.0 = unchanged)
             sub.add(multiplierField(e, "level_editor.boss_health_mult",
                     boss ? scaling.bossHealthMul : scaling.miniBossHealthMul, ScalingSettings.DEFAULT_BOSS_MULTIPLIER,

@@ -10,6 +10,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyConfig;
+import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyPreset;
 import org.Bacontete.hardcore_region_difficulty.common.config.SmartAutoSettings;
 import org.Bacontete.hardcore_region_difficulty.forge.compat.DeeperDarkerCataclysmCompat;
 import org.Bacontete.hardcore_region_difficulty.forge.compat.TravelersTitlesCompat;
@@ -38,18 +39,19 @@ public final class HrdConfigScreen {
                                 me.shedaniel.clothconfig2.impl.builders.SubCategoryBuilder group, String id,
                                 net.minecraftforge.common.ForgeConfigSpec.DoubleValue health,
                                 net.minecraftforge.common.ForgeConfigSpec.DoubleValue damage,
-                                double defaultHealth, double defaultDamage) {
+                                double defaultHealth, double defaultDamage,
+                                PresetBinding presets, int healthIndex, int damageIndex) {
         var sub = entries.startSubCategory(Component.translatable("entity.minecraft." + id)).setExpanded(false);
-        sub.add(entries.startDoubleField(t("boss.health"), health.get())
+        sub.add(presets.bind(healthIndex, entries.startDoubleField(t("boss.health"), health.get())
                 .setDefaultValue(defaultHealth).setMin(0.0D).setMax(100000.0D)
                 .setTooltip(TooltipWrap.wrap(t("boss.health.tooltip")))
                 .setSaveConsumer(health::set)
-                .build());
-        sub.add(entries.startDoubleField(t("boss.damage"), damage.get())
+                .build()));
+        sub.add(presets.bind(damageIndex, entries.startDoubleField(t("boss.damage"), damage.get())
                 .setDefaultValue(defaultDamage).setMin(0.1D).setMax(50.0D)
                 .setTooltip(TooltipWrap.wrap(t("boss.damage.tooltip")))
                 .setSaveConsumer(damage::set)
-                .build());
+                .build()));
         group.add(sub.build());
     }
 
@@ -188,7 +190,8 @@ public final class HrdConfigScreen {
         };
 
         // ---- Difficulty: regions and levels (edits hardcore_region_difficulty.json) ----
-        Runnable regionEditorSave = RegionEditorTabs.add(entries, difficulty);
+        final PresetBinding presetBinding = new PresetBinding(); // the preset panel reads / fills these fields
+        Runnable regionEditorSave = RegionEditorTabs.add(entries, difficulty, presetBinding);
 
         // ---- Scan: dimensions and structures found by the scan, level and mob stats of each ----
         Runnable scanSave = ScanEditorTabs.add(entries, scanTab);
@@ -197,9 +200,12 @@ public final class HrdConfigScreen {
         // ---- Whitelist tab, first the vanilla bosses (health / damage), stored in the common toml ----
         whitelist.addEntry(entries.startTextDescription(t("boss.note")).build());
         var bossGroup = entries.startSubCategory(t("boss.group")).setExpanded(true);
-        addBoss(entries, bossGroup, "ender_dragon", ForgeConfig.DRAGON_HEALTH, ForgeConfig.DRAGON_DAMAGE_MULTIPLIER, 1024.0D, 2.0D);
-        addBoss(entries, bossGroup, "wither", ForgeConfig.WITHER_HEALTH, ForgeConfig.WITHER_DAMAGE_MULTIPLIER, 512.0D, 2.0D);
-        addBoss(entries, bossGroup, "warden", ForgeConfig.WARDEN_HEALTH, ForgeConfig.WARDEN_DAMAGE_MULTIPLIER, 0.0D, 1.0D);
+        addBoss(entries, bossGroup, "ender_dragon", ForgeConfig.DRAGON_HEALTH, ForgeConfig.DRAGON_DAMAGE_MULTIPLIER, 1024.0D, 2.0D,
+                presetBinding, DifficultyPreset.DRAGON_HEALTH, DifficultyPreset.DRAGON_DAMAGE);
+        addBoss(entries, bossGroup, "wither", ForgeConfig.WITHER_HEALTH, ForgeConfig.WITHER_DAMAGE_MULTIPLIER, 512.0D, 2.0D,
+                presetBinding, DifficultyPreset.WITHER_HEALTH, DifficultyPreset.WITHER_DAMAGE);
+        addBoss(entries, bossGroup, "warden", ForgeConfig.WARDEN_HEALTH, ForgeConfig.WARDEN_DAMAGE_MULTIPLIER, 0.0D, 1.0D,
+                presetBinding, DifficultyPreset.WARDEN_HEALTH, DifficultyPreset.WARDEN_DAMAGE);
         whitelist.addEntry(bossGroup.build());
 
         // ---- Whitelist: which mobs are scaled (global and per region) ----

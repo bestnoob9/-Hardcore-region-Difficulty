@@ -16,6 +16,7 @@ import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraft.tags.DamageTypeTags;
@@ -59,8 +60,8 @@ public class AdvancedEnchantEvents {
     public void onHurtTrueHit(LivingHurtEvent event) {
         pendingTrueHit = null;
         DamageSource source = event.getSource();
-        if (!(source.getEntity() instanceof LivingEntity attacker)) {
-            return;
+        if (!(source.getEntity() instanceof LivingEntity attacker) || source.is(DamageTypes.THORNS)) {
+            return; // thorns has the wearer as direct entity too: it is not a hit with the held weapon
         }
         int piercing;
         int trueDamage;
@@ -115,13 +116,17 @@ public class AdvancedEnchantEvents {
         if (pending == null || !pending.target().equals(event.getEntity().getUUID())) {
             return;
         }
-        if (pending.normal() > 0.0F) {
-
-            event.setAmount(event.getAmount() * (pending.desired() / pending.normal()));
-        } else {
-
-            event.setAmount(pending.desired());
+        // LivingDamageEvent already carries the damage AFTER vanilla took the absorption (golden hearts) off, so
+        // scaling it by desired/normal gives wrong numbers. Add the extra damage the enchant earned instead; the
+        // golden hearts left soak that extra part first, like they would soak any other damage.
+        LivingEntity target = event.getEntity();
+        float extra = pending.desired() - pending.normal();
+        float absorption = target.getAbsorptionAmount();
+        float soaked = Math.min(absorption, extra);
+        if (soaked > 0.0F) {
+            target.setAbsorptionAmount(absorption - soaked);
         }
+        event.setAmount(event.getAmount() + extra - soaked);
     }
 
     private static boolean isModEnchant(net.minecraft.world.item.enchantment.Enchantment enchantment) {

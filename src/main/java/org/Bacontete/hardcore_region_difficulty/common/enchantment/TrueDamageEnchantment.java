@@ -17,9 +17,7 @@ public class TrueDamageEnchantment extends Enchantment {
     }
 
     public static float ignoredFraction(int level) {
-        if (level >= MAX_LEVEL) return 1.0F;
-        if (level <= 0) return 0.0F;
-        return level == 1 ? 0.4F : 0.7F;
+        return level > 0 ? 1.0F : 0.0F; // only level 1 exists: ignores armor, toughness, Resistance and Protection
     }
 
     private static boolean fitsItem(ItemStack stack) {
