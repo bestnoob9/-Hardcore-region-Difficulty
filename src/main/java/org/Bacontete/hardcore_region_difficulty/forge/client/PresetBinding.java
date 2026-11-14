@@ -3,17 +3,6 @@ package org.Bacontete.hardcore_region_difficulty.forge.client;
 import me.shedaniel.clothconfig2.api.AbstractConfigListEntry;
 import org.Bacontete.hardcore_region_difficulty.common.config.DifficultyPreset;
 
-/**
- * Links the preset panel to the input fields of the settings screen (the per-level growth, the boss bonuses, the
- * Ender Dragon / Wither / Warden and the raid level, which live in different groups and even different tabs).
- * <p>
- * With it the panel can
- * <ul>
- *   <li>read what is typed in the fields <b>right now</b> (also what is not saved yet), to create a preset from it,</li>
- *   <li>write the values of a preset into the fields, so the player sees them change at once.</li>
- * </ul>
- * Only load this class when cloth_config is present.
- */
 public final class PresetBinding {
 
     private final AbstractConfigListEntry<?>[] fields = new AbstractConfigListEntry<?>[DifficultyPreset.KEYS.length];
@@ -24,10 +13,6 @@ public final class PresetBinding {
         return entry;
     }
 
-    /**
-     * The values of all the fields now, in the order of {@link DifficultyPreset#KEYS}.
-     * @param fallback used for a field that is not built (or that holds no number)
-     */
     public double[] read(double[] fallback) {
         double[] out = fallback.clone();
         for (int i = 0; i < fields.length; i++) {
@@ -42,10 +27,6 @@ public final class PresetBinding {
         return out;
     }
 
-    /**
-     * Types the values of the preset into the fields.
-     * @return false if some field could not be set (the screen then still works, the player edits it by hand)
-     */
     public boolean apply(DifficultyPreset preset) {
         boolean all = true;
         for (int i = 0; i < fields.length; i++) {
@@ -61,16 +42,53 @@ public final class PresetBinding {
         return all;
     }
 
-    /**
-     * Calls {@code setValue(Object)} of the Cloth text field entries (generic erasure of {@code setValue(T)}).
-     * Reflection keeps this class free of the exact entry types of the Cloth version in use.
-     */
     private static boolean set(AbstractConfigListEntry<?> entry, Object value) {
-        try {
-            entry.getClass().getMethod("setValue", Object.class).invoke(entry, value);
-            return true;
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            return false;
+        Class<?> c = entry.getClass();
+        for (java.lang.reflect.Method m : c.getMethods()) {
+            if (!m.getName().equals("setValue") || m.getParameterCount() != 1) continue;
+            Class<?> pt = m.getParameterTypes()[0];
+            Object arg = convert(value, pt);
+            if (arg == null) continue;
+            try {
+                m.invoke(entry, arg);
+                return true;
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // try the next candidate
+            }
         }
+        String text = text(value);
+        for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
+            try {
+                java.lang.reflect.Field f = k.getDeclaredField("textFieldWidget");
+                f.setAccessible(true);
+                Object box = f.get(entry);
+                if (box instanceof net.minecraft.client.gui.components.EditBox eb) {
+                    eb.setValue(text);
+                    return true;
+                }
+            } catch (ReflectiveOperationException | RuntimeException ignored) {
+                // look in the superclass
+            }
+        }
+        return false;
+    }
+
+    private static Object convert(Object v, Class<?> type) {
+        if (type == Object.class || type.isInstance(v)) return v;
+        if (v instanceof Number n) {
+            if (type == int.class || type == Integer.class) return (int) Math.round(n.doubleValue());
+            if (type == double.class || type == Double.class) return n.doubleValue();
+            if (type == long.class || type == Long.class) return Math.round(n.doubleValue());
+        }
+        if (type == String.class) return text(v);
+        return null;
+    }
+    
+    private static String text(Object v) {
+        return v instanceof Integer || v instanceof Long ? v.toString() : trim(((Number) v).doubleValue());
+    }
+
+    private static String trim(double d) {
+        return Double.toString(d);
     }
 }

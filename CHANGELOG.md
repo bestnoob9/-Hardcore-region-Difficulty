@@ -1,11 +1,15 @@
 # Changelog
 
+## Update 1.0.9
+
+## Fixed
+
+- Fix applying difficulty presets: values are now filled into the fields correctly
+
 ## Update 1.0.8
 
 ## Changed
 - **Armor Piercing:** now ignores 15% / 30% / 60% of armor and toughness at level 1 / 2 / 3 (was 10% / 20% / 30%).
-
-## Changed
 - **Presets panel redone**
 
 ## Update 1.0.7
